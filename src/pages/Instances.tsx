@@ -340,11 +340,11 @@ const Instances: React.FC = () => {
     try {
       message.loading({ content: '正在获取微信ClawBot连接二维码...', key: 'wechat' });
       
-      // 获取连接二维码（这里需要后端支持）
-      const response = await api.post(`/instances/${instanceName}/wechat/qrcode`);
+      // 获取连接二维码 - 使用GET请求
+      const response = await api.get(`/instances/${instanceName}/wechat/qrcode`);
       
-      if (response.data.success && response.data.qrUrl) {
-        setWechatQRURL(response.data.qrUrl);
+      if (response.data.success && response.data.data?.qrUrl) {
+        setWechatQRURL(response.data.data.qrUrl);
         message.success({ content: '请扫描二维码连接', key: 'wechat' });
         
         // 轮询连接状态
@@ -361,7 +361,7 @@ const Instances: React.FC = () => {
               }, 1500);
             }
           } catch (error) {
-            console.error('Failed to poll login status:', error);
+            console.error('Failed to poll connection status:', error);
           }
         }, 2000);
         
@@ -385,7 +385,7 @@ const Instances: React.FC = () => {
     } catch (error: any) {
       console.error('Failed to get WeChat QR:', error);
       message.error({ 
-        content: '获取二维码失败，请使用 CLI 连接',
+        content: `获取二维码失败: ${error.response?.data?.error || error.message}`,
         key: 'wechat'
       });
       setWechatLoginStatus('failed');
