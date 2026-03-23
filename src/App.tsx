@@ -3,8 +3,13 @@ import { Layout } from 'antd';
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import Instances from './pages/Instances';
+import InstanceDetail from './pages/InstanceDetail';
 import Nodes from './pages/Nodes';
 import Relations from './pages/Relations';
+import Permissions from './pages/Permissions';
+import Messages from './pages/Messages';
+import Adapters from './pages/Adapters';
+import Settings from './pages/Settings';
 import './App.css';
 
 function App() {
@@ -14,13 +19,13 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/instances" element={<Instances />} />
-          <Route path="/instances/:id" element={<div>Instance Detail</div>} />
+          <Route path="/instances/:id" element={<InstanceDetail />} />
           <Route path="/nodes" element={<Nodes />} />
           <Route path="/relations" element={<Relations />} />
-          <Route path="/permissions" element={<div>Permissions</div>} />
-          <Route path="/messages" element={<div>Messages</div>} />
-          <Route path="/adapters" element={<div>Adapters</div>} />
-          <Route path="/settings" element={<div>Settings</div>} />
+          <Route path="/permissions" element={<Permissions />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/adapters" element={<Adapters />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </AppLayout>
     </Layout>
