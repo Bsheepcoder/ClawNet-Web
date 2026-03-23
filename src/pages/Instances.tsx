@@ -351,7 +351,14 @@ const Instances: React.FC = () => {
         // 连接WebSocket接收实时输出
         // 生成一个临时的 nodeId 用于 WebSocket 连接
         const tempNodeId = `web-client-${Date.now()}`;
-        const ws = new WebSocket(`ws://localhost:3000/ws?nodeId=${tempNodeId}&token=clawnet-secret-token`);
+        // 使用当前页面的 hostname 动态构建 WebSocket URL
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname;
+        const wsPort = '3000'; // 后端 WebSocket 端口
+        const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}/ws?nodeId=${tempNodeId}&token=clawnet-secret-token`;
+        
+        console.log('[WebSocket] Connecting to:', wsUrl);
+        const ws = new WebSocket(wsUrl);
         
         ws.onopen = () => {
           setWechatOutput(prev => [...prev, '✓ 已连接到服务器']);
