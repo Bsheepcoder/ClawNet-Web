@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Card, 
   Table, 
@@ -91,6 +91,16 @@ const Instances: React.FC = () => {
   const [wechatLoginStatus, setWechatLoginStatus] = useState<'pending' | 'scanned' | 'success' | 'failed'>('pending');
   const [wechatOutput, setWechatOutput] = useState<string[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
+  
+  // 终端输出容器的引用，用于自动滚动
+  const terminalRef = useRef<HTMLDivElement>(null);
+  
+  // 自动滚动到底部
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [wechatOutput]);
 
   useEffect(() => {
     fetchInstances();
@@ -786,72 +796,118 @@ const Instances: React.FC = () => {
             关闭
           </Button>,
         ]}
-        width={700}
+        width={900}
+        style={{ top: 20 }}
       >
         <div style={{ padding: '10px 0' }}>
           {/* 二维码显示区域 */}
           {wechatQRURL && (
-            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: 16,
+              padding: 16,
+              background: '#f0f2f5',
+              borderRadius: 8
+            }}>
               <img 
                 src={wechatQRURL} 
                 alt="微信ClawBot连接二维码" 
-                style={{ maxWidth: '250px', border: '2px solid #1890ff', borderRadius: 8 }}
+                style={{ 
+                  maxWidth: '300px',
+                  border: '3px solid #1890ff', 
+                  borderRadius: 8,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
               />
-              <div style={{ marginTop: 8 }}>
-                <Tag color="blue">请使用微信扫描二维码</Tag>
+              <div style={{ marginTop: 12 }}>
+                <Tag color="blue" style={{ fontSize: 14, padding: '4px 12px' }}>
+                  📱 请使用微信扫描二维码
+                </Tag>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
+                或在浏览器中打开：{wechatQRURL}
               </div>
             </div>
           )}
           
           {/* 实时终端输出 */}
-          <div style={{ 
-            background: '#1e1e1e', 
-            borderRadius: 4, 
-            padding: 12,
-            fontFamily: 'Monaco, Menlo, "Courier New", monospace',
-            fontSize: 12,
-            maxHeight: 300,
-            overflow: 'auto'
-          }}>
+          <div 
+            ref={terminalRef}
+            style={{ 
+              background: '#1e1e1e', 
+              borderRadius: 8, 
+              padding: 16,
+              fontFamily: '"Courier New", Monaco, Menlo, monospace',
+              fontSize: 11,
+              maxHeight: 500,
+              overflow: 'auto',
+              border: '1px solid #333'
+            }}
+          >
             <div style={{ 
               color: '#8c8c8c', 
-              marginBottom: 8,
+              marginBottom: 12,
               borderBottom: '1px solid #333',
-              paddingBottom: 8
+              paddingBottom: 8,
+              position: 'sticky',
+              top: 0,
+              background: '#1e1e1e',
+              zIndex: 1
             }}>
-              <Text style={{ color: '#4ec9b0' }}>Terminal</Text>
+              <Text style={{ color: '#4ec9b0', fontSize: 13 }}>Terminal</Text>
               {' '}
-              <Text style={{ color: '#8c8c8c' }}>- 微信ClawBot连接</Text>
+              <Text style={{ color: '#8c8c8c', fontSize: 13 }}>- 微信ClawBot连接</Text>
               {isExecuting && <LoadingOutlined style={{ marginLeft: 8, color: '#1890ff' }} />}
             </div>
             
             {wechatOutput.length === 0 ? (
-              <div style={{ color: '#8c8c8c', textAlign: 'center', padding: '20px 0' }}>
-                <LoadingOutlined /> 正在启动登录命令...
+              <div style={{ color: '#8c8c8c', textAlign: 'center', padding: '40px 0' }}>
+                <LoadingOutlined style={{ fontSize: 16 }} /> 正在启动登录命令...
               </div>
             ) : (
-              wechatOutput.map((line, index) => (
-                <div key={index} style={{ 
-                  color: line.startsWith('✓') ? '#4ec9b0' : 
-                         line.startsWith('❌') ? '#f48771' :
-                         line.startsWith('📱') ? '#dcdcaa' :
-                         line.includes('二维码') ? '#569cd6' :
-                         '#d4d4d4',
-                  lineHeight: '1.6',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-all'
-                }}>
-                  {line || '\u00A0'}
-                </div>
-              ))
+              <div style={{ lineHeight: '1.4' }}>
+                {wechatOutput.map((line, index) => {
+                  // 检测是否是ASCII二维码行
+                  const isQRCodeLine = line.includes('█') || line.includes('▄') || line.includes('▀');
+                  
+                  return (
+                    <div key={index} style={{ 
+                      color: line.startsWith('✓') || line.startsWith('✅') ? '#4ec9b0' : 
+                             line.startsWith('❌') ? '#f48771' :
+                             line.startsWith('📱') ? '#dcdcaa' :
+                             line.includes('二维码') ? '#569cd6' :
+                             line.includes('http') ? '#9cdcfe' :
+                             '#d4d4d4',
+                      lineHeight: isQRCodeLine ? '1.0' : '1.6',
+                      whiteSpace: isQRCodeLine ? 'pre' : 'pre-wrap',
+                      wordBreak: 'break-all',
+                      fontSize: isQRCodeLine ? 10 : 11,
+                      letterSpacing: isQRCodeLine ? '0.1em' : 'normal'
+                    }}>
+                      {line || '\u00A0'}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
           
           {/* 状态提示 */}
-          {wechatLoginStatus === 'pending' && wechatOutput.length > 0 && (
+          {wechatLoginStatus === 'pending' && wechatOutput.length > 0 && !wechatQRURL && (
             <Alert
-              message="等待微信扫码"
-              description="请在微信中打开扫一扫，扫描上方二维码或终端中的二维码"
+              message="等待生成二维码"
+              description="正在启动微信登录，请稍候..."
+              type="info"
+              showIcon
+              icon={<LoadingOutlined />}
+              style={{ marginTop: 16 }}
+            />
+          )}
+          
+          {wechatLoginStatus === 'pending' && wechatOutput.length > 0 && wechatQRURL && (
+            <Alert
+              message="请使用微信扫码"
+              description="二维码已生成，请打开微信扫一扫，扫描上方二维码或点击链接在浏览器中打开"
               type="info"
               showIcon
               icon={<WechatOutlined />}
@@ -871,7 +927,7 @@ const Instances: React.FC = () => {
           
           {wechatLoginStatus === 'success' && (
             <Alert
-              message="连接成功"
+              message="🎉 连接成功"
               description="微信ClawBot已成功连接！对话框将自动关闭。"
               type="success"
               showIcon
@@ -884,11 +940,24 @@ const Instances: React.FC = () => {
               message="连接失败"
               description={
                 <div>
-                  <p>登录失败，您可以：</p>
+                  <p style={{ marginBottom: 8 }}>登录失败，您可以：</p>
                   <ul style={{ paddingLeft: 20, marginBottom: 0 }}>
-                    <li>点击"连接"按钮重试</li>
-                    <li>使用CLI命令：openclaw --profile {wechatInstance} channels login --channel openclaw-weixin</li>
+                    <li>关闭对话框后重新点击"连接"按钮重试</li>
+                    <li>在终端手动执行命令：</li>
                   </ul>
+                  <Paragraph 
+                    copyable={{ text: `openclaw --profile ${wechatInstance} channels login --channel openclaw-weixin` }}
+                    style={{ 
+                      margin: '8px 0 0 0', 
+                      fontFamily: 'monospace',
+                      background: '#f5f5f5',
+                      padding: 8,
+                      borderRadius: 4,
+                      fontSize: 12
+                    }}
+                  >
+                    openclaw --profile {wechatInstance} channels login --channel openclaw-weixin
+                  </Paragraph>
                 </div>
               }
               type="error"
@@ -898,17 +967,24 @@ const Instances: React.FC = () => {
           )}
           
           {/* 手动执行提示 */}
-          <div style={{ marginTop: 16, color: '#8c8c8c', fontSize: 12 }}>
-            <Space split={<Divider type="vertical" />}>
-              <span>💡 如果自动执行失败，请手动运行命令</span>
+          {!wechatQRURL && wechatOutput.length > 0 && (
+            <div style={{ marginTop: 16, padding: 12, background: '#f0f2f5', borderRadius: 4, fontSize: 12 }}>
+              <div style={{ color: '#8c8c8c', marginBottom: 8 }}>💡 如果自动执行失败，请手动运行命令：</div>
               <Paragraph 
                 copyable={{ text: `openclaw --profile ${wechatInstance} channels login --channel openclaw-weixin` }}
-                style={{ margin: 0, fontFamily: 'monospace' }}
+                style={{ 
+                  margin: 0, 
+                  fontFamily: 'monospace',
+                  background: '#fff',
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #d9d9d9'
+                }}
               >
-                复制命令
+                openclaw --profile {wechatInstance} channels login --channel openclaw-weixin
               </Paragraph>
-            </Space>
-          </div>
+            </div>
+          )}
         </div>
       </Modal>
     </div>
