@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Row, Col, Card, Statistic, Button, Space, List, Tag, Spin } from 'antd';
 import {
-  CloudServerOutlined,
-  NodeIndexOutlined,
-  ShareAltOutlined,
   MessageOutlined,
   PlusCircleOutlined,
   SendOutlined,
@@ -35,18 +32,18 @@ const Dashboard: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 并行请求所有数据
+      // 并行请求所有数据，但每个都独立捕获错误
       const [healthRes, instancesRes, nodesRes, relationsRes] = await Promise.all([
-        api.get('/health'),
-        api.get('/instances'),
-        api.get('/nodes'),
-        api.get('/relations'),
+        api.get('/health').catch(() => ({ data: { stats: { nodes: 0, relations: 0 } } })),
+        api.get('/instances').catch(() => ({ data: { data: [] } })),
+        api.get('/nodes').catch(() => ({ data: { data: [] } })),
+        api.get('/relations').catch(() => ({ data: { data: [] } })),
       ]);
 
-      const health = healthRes.data;
-      const instancesData = instancesRes.data.data || [];
-      const nodesData = nodesRes.data.data || [];
-      const relationsData = relationsRes.data.data || [];
+      const health = healthRes.data || {};
+      const instancesData = instancesRes.data?.data || [];
+      const nodesData = nodesRes.data?.data || [];
+      const relationsData = relationsRes.data?.data || [];
 
       setStats({
         instances: {

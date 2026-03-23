@@ -1,8 +1,8 @@
 import React from 'react';
-import { Card, Row, Col, List, Tag, Button, Space, Switch, Alert } from 'antd';
+import { Card, Row, Col, List, Tag, Button, Space, Alert } from 'antd';
 import { 
   WechatOutlined, 
-  TelegramOutlined,
+  MessageOutlined,
   ApiOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined
@@ -30,7 +30,7 @@ const Adapters: React.FC = () => {
     {
       id: 'telegram-bot',
       name: 'Telegram Bot',
-      icon: <TelegramOutlined style={{ fontSize: 24 }} />,
+      icon: <MessageOutlined style={{ fontSize: 24 }} />,
       status: 'disconnected',
       type: 'telegram',
       description: 'Telegram 机器人适配器',

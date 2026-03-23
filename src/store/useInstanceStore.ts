@@ -19,7 +19,7 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     try {
       // const response = await api.get('/instances');
       // set({ instances: response.data.data, loading: false });
-    } catch (error: {
+    } catch (error: any) {
       set({ error: error.message, loading: false });
     }
   },

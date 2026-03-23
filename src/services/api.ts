@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const DEFAULT_TOKEN = 'clawnet-secret-token'; // 默认 Token
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -12,10 +13,8 @@ const api = axios.create({
 // 请求拦截器 - 添加 Token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('clawnet_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    const token = localStorage.getItem('clawnet_token') || DEFAULT_TOKEN;
+    config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => {
