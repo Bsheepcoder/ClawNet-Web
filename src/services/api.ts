@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// 开发环境使用代理，生产环境使用实际地址
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const DEFAULT_TOKEN = 'clawnet-secret-token'; // 默认 Token
 
 const api = axios.create({
