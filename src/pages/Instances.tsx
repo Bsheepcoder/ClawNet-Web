@@ -84,7 +84,7 @@ const Instances: React.FC = () => {
   const [createSteps, setCreateSteps] = useState<ProgressStep[]>([]);
   const [createLogs, setCreateLogs] = useState<string[]>([]);
   
-  // 微信登录相关状态
+  // 微信ClawBot连接相关状态
   const [isWechatModalVisible, setIsWechatModalVisible] = useState(false);
   const [wechatInstance, setWechatInstance] = useState<string>('');
   const [wechatQRURL, setWechatQRURL] = useState<string>('');
@@ -338,23 +338,23 @@ const Instances: React.FC = () => {
     setWechatQRURL('');
     
     try {
-      message.loading({ content: '正在获取微信登录二维码...', key: 'wechat' });
+      message.loading({ content: '正在获取微信ClawBot连接二维码...', key: 'wechat' });
       
-      // 获取登录二维码（这里需要后端支持）
+      // 获取连接二维码（这里需要后端支持）
       const response = await api.post(`/instances/${instanceName}/wechat/qrcode`);
       
       if (response.data.success && response.data.qrUrl) {
         setWechatQRURL(response.data.qrUrl);
-        message.success({ content: '请扫描二维码登录', key: 'wechat' });
+        message.success({ content: '请扫描二维码连接', key: 'wechat' });
         
-        // 轮询登录状态
+        // 轮询连接状态
         const pollInterval = setInterval(async () => {
           try {
             const statusRes = await api.get(`/instances/${instanceName}`);
             if (statusRes.data.data?.wechat?.loggedIn) {
               clearInterval(pollInterval);
               setWechatLoginStatus('success');
-              message.success('微信登录成功！');
+              message.success('微信ClawBot连接成功！');
               setTimeout(() => {
                 setIsWechatModalVisible(false);
                 fetchInstances();
@@ -370,14 +370,14 @@ const Instances: React.FC = () => {
           clearInterval(pollInterval);
           if (wechatLoginStatus === 'pending') {
             setWechatLoginStatus('failed');
-            message.warning('登录超时，请重试');
+            message.warning('连接超时，请重试');
           }
         }, 60000);
       } else {
         // 如果没有二维码 URL，显示提示
         setWechatLoginStatus('pending');
         message.info({ 
-          content: '请在终端运行以下命令进行微信登录：',
+          content: '请在终端运行以下命令进行微信ClawBot连接：',
           key: 'wechat',
           duration: 5
         });
@@ -385,7 +385,7 @@ const Instances: React.FC = () => {
     } catch (error: any) {
       console.error('Failed to get WeChat QR:', error);
       message.error({ 
-        content: '获取二维码失败，请使用 CLI 登录',
+        content: '获取二维码失败，请使用 CLI 连接',
         key: 'wechat'
       });
       setWechatLoginStatus('failed');
@@ -434,7 +434,7 @@ const Instances: React.FC = () => {
       render: (wechat: any, record: Instance) => (
         <Space direction="vertical" size="small">
           <Tag color={wechat?.loggedIn ? 'success' : 'default'} icon={<WechatOutlined />}>
-            {wechat?.loggedIn ? '已登录' : '未登录'}
+            {wechat?.loggedIn ? '已连接' : '未连接'}
           </Tag>
           {!wechat?.loggedIn && (
             <Button 
@@ -443,7 +443,7 @@ const Instances: React.FC = () => {
               icon={<QrcodeOutlined />}
               onClick={() => handleWechatLogin(record.name)}
             >
-              登录
+              连接
             </Button>
           )}
         </Space>
@@ -693,14 +693,14 @@ const Instances: React.FC = () => {
             <li>实例将自动分配端口（19000-19099）</li>
             <li>每个实例有独立的配置目录和数据存储</li>
             <li>微信插件安装约需 30-60 秒</li>
-            <li>创建完成后可扫码登录微信</li>
+            <li>创建完成后可扫码连接微信</li>
           </ul>
         </div>
       </Modal>
 
-      {/* 微信登录对话框 */}
+      {/* 微信ClawBot连接对话框 */}
       <Modal
-        title={<><WechatOutlined /> 微信登录 - {wechatInstance}</>}
+        title={<><WechatOutlined /> 微信ClawBot连接 - {wechatInstance}</>}
         open={isWechatModalVisible}
         onCancel={() => {
           setIsWechatModalVisible(false);
@@ -723,10 +723,10 @@ const Instances: React.FC = () => {
             <>
               <img 
                 src={wechatQRURL} 
-                alt="微信登录二维码" 
+                alt="微信ClawBot连接二维码" 
                 style={{ maxWidth: '100%', marginBottom: 16 }}
               />
-              <p>请使用微信扫描二维码登录</p>
+              <p>请使用微信扫描二维码连接</p>
               {wechatLoginStatus === 'pending' && (
                 <Text type="secondary">
                   <LoadingOutlined /> 等待扫码...
@@ -734,17 +734,17 @@ const Instances: React.FC = () => {
               )}
               {wechatLoginStatus === 'success' && (
                 <Text type="success">
-                  <CheckCircleOutlined /> 登录成功！
+                  <CheckCircleOutlined /> 连接成功！
                 </Text>
               )}
             </>
           ) : (
             <div>
               <Alert
-                message="使用 CLI 登录"
+                message="使用 CLI 连接"
                 description={
                   <div>
-                    <p>Web 端暂不支持扫码登录，请在终端运行：</p>
+                    <p>Web 端暂不支持扫码连接，请在终端运行：</p>
                     <Paragraph 
                       copyable 
                       style={{ 
