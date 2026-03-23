@@ -84,11 +84,13 @@ const Instances: React.FC = () => {
   const [createSteps, setCreateSteps] = useState<ProgressStep[]>([]);
   const [createLogs, setCreateLogs] = useState<string[]>([]);
   
-  // 微信ClawBot连接相关状态
+  // 微信登录相关状态
   const [isWechatModalVisible, setIsWechatModalVisible] = useState(false);
   const [wechatInstance, setWechatInstance] = useState<string>('');
   const [wechatQRURL, setWechatQRURL] = useState<string>('');
   const [wechatLoginStatus, setWechatLoginStatus] = useState<'pending' | 'scanned' | 'success' | 'failed'>('pending');
+  const [wechatOutput, setWechatOutput] = useState<string[]>([]);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   useEffect(() => {
     fetchInstances();
@@ -336,63 +338,114 @@ const Instances: React.FC = () => {
     setIsWechatModalVisible(true);
     setWechatLoginStatus('pending');
     setWechatQRURL('');
+    setWechatOutput([]);
+    setIsExecuting(true);
     
     try {
-      message.loading({ content: '正在获取微信ClawBot连接信息...', key: 'wechat' });
+      // 调用后端API启动登录命令
+      const response = await api.post(`/instances/${instanceName}/wechat/login`);
       
-      // 获取连接信息
-      const response = await api.get(`/instances/${instanceName}/wechat/qrcode`);
-      
-      // Web端暂不支持直接扫码，显示CLI命令
-      if (!response.data.success && response.data.fallback) {
-        setWechatLoginStatus('pending');
-        message.info({ 
-          content: '请在终端中使用命令连接',
-          key: 'wechat',
-          duration: 5
-        });
-        return;
-      }
-      
-      // 如果后端支持二维码（未来功能）
-      if (response.data.success && response.data.data?.qrUrl) {
-        setWechatQRURL(response.data.data.qrUrl);
-        message.success({ content: '请扫描二维码连接', key: 'wechat' });
+      if (response.data.success) {
+        const sessionId = response.data.data.sessionId;
         
-        // 轮询连接状态
-        const pollInterval = setInterval(async () => {
+        // 连接WebSocket接收实时输出
+        const ws = new WebSocket(`ws://localhost:3000/ws`);
+        
+        ws.onopen = () => {
+          setWechatOutput(prev => [...prev, '✓ 已连接到服务器']);
+          setWechatOutput(prev => [...prev, `✓ 登录会话: ${sessionId}`]);
+          setWechatOutput(prev => [...prev, '']);
+        };
+        
+        ws.onmessage = (event) => {
           try {
-            const statusRes = await api.get(`/instances/${instanceName}`);
-            if (statusRes.data.data?.wechat?.loggedIn) {
-              clearInterval(pollInterval);
-              setWechatLoginStatus('success');
-              message.success('微信ClawBot连接成功！');
-              setTimeout(() => {
-                setIsWechatModalVisible(false);
-                fetchInstances();
-              }, 1500);
+            const data = JSON.parse(event.data);
+            
+            if (data.sessionId === sessionId) {
+              switch (data.type) {
+                case 'wechat:login:output':
+                  // 添加输出行
+                  data.output.split('\n').forEach((line: string) => {
+                    if (line.trim()) {
+                      setWechatOutput(prev => [...prev, line]);
+                    }
+                  });
+                  break;
+                  
+                case 'wechat:login:qrcode':
+                  // 检测到二维码URL
+                  setWechatQRURL(data.qrUrl);
+                  setWechatLoginStatus('scanned');
+                  setWechatOutput(prev => [...prev, '']);
+                  setWechatOutput(prev => [...prev, '📱 检测到二维码！']);
+                  setWechatOutput(prev => [...prev, '请使用微信扫描上方二维码']);
+                  break;
+                  
+                case 'wechat:login:complete':
+                  // 登录完成
+                  ws.close();
+                  setIsExecuting(false);
+                  
+                  if (data.code === 0) {
+                    setWechatLoginStatus('success');
+                    setWechatOutput(prev => [...prev, '']);
+                    setWechatOutput(prev => [...prev, '✅ 微信ClawBot连接成功！']);
+                    
+                    setTimeout(() => {
+                      setIsWechatModalVisible(false);
+                      fetchInstances();
+                    }, 2000);
+                  } else {
+                    setWechatLoginStatus('failed');
+                    setWechatOutput(prev => [...prev, '']);
+                    setWechatOutput(prev => [...prev, `❌ 登录失败 (退出码: ${data.code})`]);
+                  }
+                  break;
+                  
+                case 'wechat:login:error':
+                  ws.close();
+                  setIsExecuting(false);
+                  setWechatLoginStatus('failed');
+                  setWechatOutput(prev => [...prev, '']);
+                  setWechatOutput(prev => [...prev, `❌ 错误: ${data.error}`]);
+                  break;
+              }
             }
-          } catch (error) {
-            console.error('Failed to poll connection status:', error);
+          } catch (e) {
+            // 忽略解析错误
           }
-        }, 2000);
+        };
         
-        // 60秒后停止轮询
+        ws.onerror = () => {
+          setIsExecuting(false);
+          setWechatLoginStatus('failed');
+          setWechatOutput(prev => [...prev, '']);
+          setWechatOutput(prev => [...prev, '❌ WebSocket连接失败']);
+        };
+        
+        ws.onclose = () => {
+          setIsExecuting(false);
+        };
+        
+        // 60秒超时
         setTimeout(() => {
-          clearInterval(pollInterval);
-          if (wechatLoginStatus === 'pending') {
-            setWechatLoginStatus('failed');
-            message.warning('连接超时，请重试');
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close();
+            setIsExecuting(false);
+            if (wechatLoginStatus === 'pending') {
+              setWechatLoginStatus('failed');
+              setWechatOutput(prev => [...prev, '']);
+              setWechatOutput(prev => [...prev, '⏱️ 连接超时，请重试']);
+            }
           }
         }, 60000);
       }
     } catch (error: any) {
-      console.error('Failed to get WeChat connection info:', error);
-      message.error({ 
-        content: `获取连接信息失败: ${error.response?.data?.error || error.message}`,
-        key: 'wechat'
-      });
+      console.error('Failed to start login:', error);
+      setIsExecuting(false);
       setWechatLoginStatus('failed');
+      setWechatOutput(prev => [...prev, '']);
+      setWechatOutput(prev => [...prev, `❌ 启动失败: ${error.response?.data?.error || error.message}`]);
     }
   };
 
@@ -710,112 +763,143 @@ const Instances: React.FC = () => {
           setIsWechatModalVisible(false);
           setWechatQRURL('');
           setWechatLoginStatus('pending');
+          setWechatOutput([]);
+          setIsExecuting(false);
         }}
         footer={[
           <Button key="close" onClick={() => {
             setIsWechatModalVisible(false);
             setWechatQRURL('');
             setWechatLoginStatus('pending');
+            setWechatOutput([]);
+            setIsExecuting(false);
           }}>
             关闭
           </Button>,
         ]}
-        width={600}
+        width={700}
       >
         <div style={{ padding: '10px 0' }}>
-          {wechatQRURL ? (
-            // 如果有二维码URL（未来支持）
-            <div style={{ textAlign: 'center' }}>
+          {/* 二维码显示区域 */}
+          {wechatQRURL && (
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
               <img 
                 src={wechatQRURL} 
                 alt="微信ClawBot连接二维码" 
-                style={{ maxWidth: '100%', marginBottom: 16 }}
+                style={{ maxWidth: '250px', border: '2px solid #1890ff', borderRadius: 8 }}
               />
-              <p>请使用微信扫描二维码连接</p>
-              {wechatLoginStatus === 'pending' && (
-                <Text type="secondary">
-                  <LoadingOutlined /> 等待扫码...
-                </Text>
-              )}
-              {wechatLoginStatus === 'success' && (
-                <Text type="success">
-                  <CheckCircleOutlined /> 连接成功！
-                </Text>
-              )}
-            </div>
-          ) : (
-            // CLI连接方式（当前推荐）
-            <div>
-              <Alert
-                message="使用终端命令连接"
-                description={
-                  <div>
-                    <p style={{ marginBottom: 12 }}>
-                      微信ClawBot连接需要通过终端完成，请按以下步骤操作：
-                    </p>
-                    
-                    <div style={{ marginBottom: 16 }}>
-                      <Text strong>第1步：复制命令</Text>
-                      <Paragraph 
-                        copyable={{ text: `openclaw --profile ${wechatInstance} channels login --channel openclaw-weixin` }}
-                        style={{ 
-                          background: '#f5f5f5', 
-                          padding: 12, 
-                          borderRadius: 4,
-                          fontFamily: 'monospace',
-                          marginTop: 8
-                        }}
-                      >
-                        openclaw --profile {wechatInstance} channels login --channel openclaw-weixin
-                      </Paragraph>
-                    </div>
-                    
-                    <div style={{ marginBottom: 16 }}>
-                      <Text strong>第2步：在终端中执行</Text>
-                      <ul style={{ marginTop: 8, paddingLeft: 20, color: '#666' }}>
-                        <li>打开终端（Terminal）</li>
-                        <li>粘贴并执行上述命令</li>
-                        <li>等待二维码在终端显示</li>
-                      </ul>
-                    </div>
-                    
-                    <div style={{ marginBottom: 16 }}>
-                      <Text strong>第3步：扫描二维码</Text>
-                      <ul style={{ marginTop: 8, paddingLeft: 20, color: '#666' }}>
-                        <li>打开微信 → 发现 → 扫一扫</li>
-                        <li>扫描终端中显示的二维码</li>
-                        <li>如果二维码不清晰，命令会输出URL</li>
-                        <li>可在浏览器中打开URL查看高清二维码</li>
-                      </ul>
-                    </div>
-                    
-                    <div style={{ marginBottom: 16 }}>
-                      <Text strong>第4步：完成连接</Text>
-                      <ul style={{ marginTop: 8, paddingLeft: 20, color: '#666' }}>
-                        <li>按照微信提示完成授权</li>
-                        <li>终端显示"✅ 连接成功"</li>
-                        <li>关闭此对话框并刷新页面查看状态</li>
-                      </ul>
-                    </div>
-                    
-                    <Divider />
-                    
-                    <div style={{ background: '#e6f7ff', padding: 12, borderRadius: 4 }}>
-                      <Text strong>💡 提示</Text>
-                      <ul style={{ marginTop: 8, paddingLeft: 20, marginBottom: 0 }}>
-                        <li>微信登录是一次性操作，使用CLI更可靠</li>
-                        <li>连接成功后，ClawBot会自动保持在线</li>
-                        <li>如需重新连接，再次运行命令即可</li>
-                      </ul>
-                    </div>
-                  </div>
-                }
-                type="info"
-                showIcon
-                icon={<InfoCircleOutlined />}
-              />
+              <div style={{ marginTop: 8 }}>
+                <Tag color="blue">请使用微信扫描二维码</Tag>
+              </div>
             </div>
           )}
+          
+          {/* 实时终端输出 */}
+          <div style={{ 
+            background: '#1e1e1e', 
+            borderRadius: 4, 
+            padding: 12,
+            fontFamily: 'Monaco, Menlo, "Courier New", monospace',
+            fontSize: 12,
+            maxHeight: 300,
+            overflow: 'auto'
+          }}>
+            <div style={{ 
+              color: '#8c8c8c', 
+              marginBottom: 8,
+              borderBottom: '1px solid #333',
+              paddingBottom: 8
+            }}>
+              <Text style={{ color: '#4ec9b0' }}>Terminal</Text>
+              {' '}
+              <Text style={{ color: '#8c8c8c' }}>- 微信ClawBot连接</Text>
+              {isExecuting && <LoadingOutlined style={{ marginLeft: 8, color: '#1890ff' }} />}
+            </div>
+            
+            {wechatOutput.length === 0 ? (
+              <div style={{ color: '#8c8c8c', textAlign: 'center', padding: '20px 0' }}>
+                <LoadingOutlined /> 正在启动登录命令...
+              </div>
+            ) : (
+              wechatOutput.map((line, index) => (
+                <div key={index} style={{ 
+                  color: line.startsWith('✓') ? '#4ec9b0' : 
+                         line.startsWith('❌') ? '#f48771' :
+                         line.startsWith('📱') ? '#dcdcaa' :
+                         line.includes('二维码') ? '#569cd6' :
+                         '#d4d4d4',
+                  lineHeight: '1.6',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all'
+                }}>
+                  {line || '\u00A0'}
+                </div>
+              ))
+            )}
+          </div>
+          
+          {/* 状态提示 */}
+          {wechatLoginStatus === 'pending' && wechatOutput.length > 0 && (
+            <Alert
+              message="等待微信扫码"
+              description="请在微信中打开扫一扫，扫描上方二维码或终端中的二维码"
+              type="info"
+              showIcon
+              icon={<WechatOutlined />}
+              style={{ marginTop: 16 }}
+            />
+          )}
+          
+          {wechatLoginStatus === 'scanned' && (
+            <Alert
+              message="已检测到二维码"
+              description="二维码已就绪，请使用微信扫描完成连接"
+              type="success"
+              showIcon
+              style={{ marginTop: 16 }}
+            />
+          )}
+          
+          {wechatLoginStatus === 'success' && (
+            <Alert
+              message="连接成功"
+              description="微信ClawBot已成功连接！对话框将自动关闭。"
+              type="success"
+              showIcon
+              style={{ marginTop: 16 }}
+            />
+          )}
+          
+          {wechatLoginStatus === 'failed' && (
+            <Alert
+              message="连接失败"
+              description={
+                <div>
+                  <p>登录失败，您可以：</p>
+                  <ul style={{ paddingLeft: 20, marginBottom: 0 }}>
+                    <li>点击"连接"按钮重试</li>
+                    <li>使用CLI命令：openclaw --profile {wechatInstance} channels login --channel openclaw-weixin</li>
+                  </ul>
+                </div>
+              }
+              type="error"
+              showIcon
+              style={{ marginTop: 16 }}
+            />
+          )}
+          
+          {/* 手动执行提示 */}
+          <div style={{ marginTop: 16, color: '#8c8c8c', fontSize: 12 }}>
+            <Space split={<Divider type="vertical" />}>
+              <span>💡 如果自动执行失败，请手动运行命令</span>
+              <Paragraph 
+                copyable={{ text: `openclaw --profile ${wechatInstance} channels login --channel openclaw-weixin` }}
+                style={{ margin: 0, fontFamily: 'monospace' }}
+              >
+                复制命令
+              </Paragraph>
+            </Space>
+          </div>
         </div>
       </Modal>
     </div>
