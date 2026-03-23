@@ -31,7 +31,8 @@ import {
   QrcodeOutlined,
   LoadingOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined
+  CloseCircleOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -286,6 +287,30 @@ const Instances: React.FC = () => {
         }
       },
     });
+  };
+
+  const handleConnectToClawnet = async (name: string) => {
+    try {
+      message.loading({ content: `正在连接 ${name} 到 ClawNet...`, key: 'connect' });
+      
+      const response = await api.post(`/instances/${name}/connect`);
+      
+      if (response.data.success) {
+        message.success({ content: `${name} 已成功连接到 ClawNet`, key: 'connect' });
+        fetchInstances();
+      } else {
+        message.error({ 
+          content: `连接失败: ${response.data.error || '未知错误'}`, 
+          key: 'connect' 
+        });
+      }
+    } catch (error: any) {
+      console.error('Failed to connect to ClawNet:', error);
+      message.error({ 
+        content: `连接失败: ${error.response?.data?.error || error.message}`,
+        key: 'connect' 
+      });
+    }
   };
 
   const handleDelete = async (name: string, force: boolean = false) => {
@@ -579,6 +604,39 @@ const Instances: React.FC = () => {
             >
               启动
             </Button>
+          )}
+          
+          {!record.clawnet?.connected && record.status === 'running' && (
+            <Tooltip title="已连接到ClawNet">
+              <Button 
+                type="link" 
+                size="small"
+                icon={<CheckCircleOutlined />}
+                style={{ color: '#52c41a' }}
+              >
+                ✓ ClawNet
+              </Button>
+            </Tooltip>
+          )}
+          
+          {(!record.clawnet?.connected || record.status !== 'running') && (
+            <Tooltip title={record.status !== 'running' ? '需要先启动实例' : '连接到ClawNet'}>
+              <Button 
+                type="link" 
+                size="small"
+                icon={<CloseCircleOutlined />}
+                onClick={() => {
+                  if (record.status !== 'running') {
+                    message.warning('请先启动实例');
+                  } else {
+                    handleConnectToClawnet(record.name);
+                  }
+                }}
+                style={{ color: record.status !== 'running' ? '#8c8c8c' : '#1890ff' }}
+              >
+                <LinkOutlined /> 连接ClawNet
+              </Button>
+            </Tooltip>
           )}
           
           <Button 
