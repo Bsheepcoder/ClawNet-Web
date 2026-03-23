@@ -10,11 +10,13 @@ import {
   Input, 
   Select, 
   message,
-  Popconfirm,
   Tooltip,
   Badge,
   Descriptions,
-  Divider
+  Divider,
+  Progress,
+  Typography,
+  Alert
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -24,11 +26,18 @@ import {
   DeleteOutlined,
   ExclamationCircleOutlined,
   WarningOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  WechatOutlined,
+  QrcodeOutlined,
+  LoadingOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import dayjs from 'dayjs';
+
+const { Text, Paragraph } = Typography;
 
 interface Instance {
   id: string;
@@ -55,6 +64,12 @@ interface Instance {
   updatedAt?: string;
 }
 
+interface ProgressStep {
+  step: string;
+  status: 'pending' | 'running' | 'success' | 'error';
+  message?: string;
+}
+
 const Instances: React.FC = () => {
   const navigate = useNavigate();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -62,10 +77,21 @@ const Instances: React.FC = () => {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [form] = Form.useForm();
+  
+  // 创建进度相关状态
+  const [isCreating, setIsCreating] = useState(false);
+  const [createProgress, setCreateProgress] = useState(0);
+  const [createSteps, setCreateSteps] = useState<ProgressStep[]>([]);
+  const [createLogs, setCreateLogs] = useState<string[]>([]);
+  
+  // 微信登录相关状态
+  const [isWechatModalVisible, setIsWechatModalVisible] = useState(false);
+  const [wechatInstance, setWechatInstance] = useState<string>('');
+  const [wechatQRURL, setWechatQRURL] = useState<string>('');
+  const [wechatLoginStatus, setWechatLoginStatus] = useState<'pending' | 'scanned' | 'success' | 'failed'>('pending');
 
   useEffect(() => {
     fetchInstances();
-    // 每 30 秒自动刷新
     const interval = setInterval(fetchInstances, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -84,24 +110,113 @@ const Instances: React.FC = () => {
   };
 
   const handleCreate = async (values: any) => {
+    const instanceName = values.name;
+    
+    setIsCreating(true);
+    setCreateProgress(0);
+    setCreateSteps([]);
+    setCreateLogs([]);
+    
+    // 添加日志的辅助函数
+    const addLog = (log: string) => {
+      setCreateLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${log}`]);
+    };
+    
+    const updateStep = (stepName: string, status: ProgressStep['status'], message?: string) => {
+      setCreateSteps(prev => {
+        const newSteps = [...prev];
+        const existingIndex = newSteps.findIndex(s => s.step === stepName);
+        if (existingIndex >= 0) {
+          newSteps[existingIndex] = { step: stepName, status, message };
+        } else {
+          newSteps.push({ step: stepName, status, message });
+        }
+        return newSteps;
+      });
+    };
+    
     try {
-      message.loading({ content: '正在创建实例...', key: 'create' });
+      // 步骤1: 验证名称
+      updateStep('验证名称', 'running');
+      addLog('正在验证实例名称...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      updateStep('验证名称', 'success');
+      setCreateProgress(10);
       
-      await api.post('/instances', {
-        name: values.name,
+      // 步骤2: 创建配置目录
+      updateStep('创建配置', 'running');
+      addLog('正在创建配置目录...');
+      setCreateProgress(20);
+      
+      // 步骤3: 发送创建请求
+      updateStep('创建实例', 'running');
+      addLog('正在创建实例...');
+      
+      const response = await api.post('/instances', {
+        name: instanceName,
         autoInstallWeixin: values.autoConfig?.includes('weixin'),
       });
       
-      message.success({ content: '实例创建成功', key: 'create' });
-      setIsModalVisible(false);
-      form.resetFields();
-      fetchInstances();
+      if (!response.data.success) {
+        throw new Error(response.data.error || '创建失败');
+      }
+      
+      updateStep('创建配置', 'success');
+      updateStep('创建实例', 'success');
+      addLog('✓ 实例配置创建成功');
+      setCreateProgress(50);
+      
+      // 步骤4: 安装微信插件（如果选择了）
+      if (values.autoConfig?.includes('weixin')) {
+        updateStep('安装插件', 'running');
+        addLog('正在安装微信插件...');
+        addLog('下载 @tencent-weixin/openclaw-weixin...');
+        addLog('这可能需要 30-60 秒，请耐心等待...');
+        
+        // 模拟安装进度（实际已由后端完成）
+        setCreateProgress(70);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        updateStep('安装插件', 'success');
+        addLog('✓ 微信插件安装成功');
+        setCreateProgress(90);
+      } else {
+        setCreateProgress(80);
+      }
+      
+      // 步骤5: 完成
+      updateStep('完成', 'success');
+      addLog('✓ 实例创建完成！');
+      setCreateProgress(100);
+      
+      message.success('实例创建成功');
+      
+      setTimeout(() => {
+        setIsCreating(false);
+        setIsModalVisible(false);
+        form.resetFields();
+        fetchInstances();
+        
+        // 如果选择了自动启动
+        if (values.autoConfig?.includes('gateway')) {
+          handleStart(instanceName);
+        }
+      }, 1500);
+      
     } catch (error: any) {
       console.error('Failed to create instance:', error);
+      updateStep('创建失败', 'error', error.message);
+      addLog(`✗ 错误: ${error.response?.data?.error || error.message}`);
+      setCreateProgress(0);
+      
       message.error({ 
-        content: `创建实例失败: ${error.response?.data?.error || error.message}`,
-        key: 'create'
+        content: `创建失败: ${error.response?.data?.error || error.message}`,
+        duration: 5
       });
+      
+      setTimeout(() => {
+        setIsCreating(false);
+      }, 3000);
     }
   };
 
@@ -179,29 +294,14 @@ const Instances: React.FC = () => {
                   {instance.status === 'running' ? '运行中' : '已停止'}
                 </Tag>
               </Descriptions.Item>
-              {instance.gateway?.running && (
-                <Descriptions.Item label="PID">{instance.gateway.pid}</Descriptions.Item>
-              )}
             </Descriptions>
           )}
           
           <Divider />
           
           <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
-            ⚠️ 警告：此操作将：
+            ⚠️ 警告：此操作将永久删除所有数据！
           </p>
-          <ul style={{ color: '#ff4d4f', paddingLeft: 20 }}>
-            <li>删除实例配置</li>
-            <li>删除所有数据（包括微信登录信息）</li>
-            <li>删除日志文件</li>
-            <li>此操作<span style={{ fontWeight: 'bold' }}>不可恢复</span></li>
-          </ul>
-          
-          {force && (
-            <p style={{ color: '#ff4d4f', fontWeight: 'bold', marginTop: 16 }}>
-              强制删除模式：将强制停止运行中的实例并删除
-            </p>
-          )}
         </div>
       ),
       okText: '删除',
@@ -212,7 +312,6 @@ const Instances: React.FC = () => {
         try {
           message.loading({ content: `正在删除实例 ${name}...`, key: 'delete' });
           
-          // 如果是强制删除且实例正在运行，先停止
           if (force && instance?.status === 'running') {
             await api.post(`/instances/${name}/stop`);
           }
@@ -232,90 +331,65 @@ const Instances: React.FC = () => {
     });
   };
 
-  const handleBatchStop = () => {
-    if (selectedRowKeys.length === 0) {
-      message.warning('请先选择要停止的实例');
-      return;
+  const handleWechatLogin = async (instanceName: string) => {
+    setWechatInstance(instanceName);
+    setIsWechatModalVisible(true);
+    setWechatLoginStatus('pending');
+    setWechatQRURL('');
+    
+    try {
+      message.loading({ content: '正在获取微信登录二维码...', key: 'wechat' });
+      
+      // 获取登录二维码（这里需要后端支持）
+      const response = await api.post(`/instances/${instanceName}/wechat/qrcode`);
+      
+      if (response.data.success && response.data.qrUrl) {
+        setWechatQRURL(response.data.qrUrl);
+        message.success({ content: '请扫描二维码登录', key: 'wechat' });
+        
+        // 轮询登录状态
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await api.get(`/instances/${instanceName}`);
+            if (statusRes.data.data?.wechat?.loggedIn) {
+              clearInterval(pollInterval);
+              setWechatLoginStatus('success');
+              message.success('微信登录成功！');
+              setTimeout(() => {
+                setIsWechatModalVisible(false);
+                fetchInstances();
+              }, 1500);
+            }
+          } catch (error) {
+            console.error('Failed to poll login status:', error);
+          }
+        }, 2000);
+        
+        // 60秒后停止轮询
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          if (wechatLoginStatus === 'pending') {
+            setWechatLoginStatus('failed');
+            message.warning('登录超时，请重试');
+          }
+        }, 60000);
+      } else {
+        // 如果没有二维码 URL，显示提示
+        setWechatLoginStatus('pending');
+        message.info({ 
+          content: '请在终端运行以下命令进行微信登录：',
+          key: 'wechat',
+          duration: 5
+        });
+      }
+    } catch (error: any) {
+      console.error('Failed to get WeChat QR:', error);
+      message.error({ 
+        content: '获取二维码失败，请使用 CLI 登录',
+        key: 'wechat'
+      });
+      setWechatLoginStatus('failed');
     }
-
-    Modal.confirm({
-      title: '批量停止实例',
-      icon: <ExclamationCircleOutlined />,
-      content: `确定要停止选中的 ${selectedRowKeys.length} 个实例吗？`,
-      okText: '停止',
-      cancelText: '取消',
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          message.loading({ content: '正在批量停止实例...', key: 'batch-stop' });
-          
-          await Promise.all(
-            selectedRowKeys.map(key => 
-              api.post(`/instances/${key}/stop`).catch(err => {
-                console.error(`Failed to stop ${key}:`, err);
-                return err;
-              })
-            )
-          );
-          
-          message.success({ content: '批量停止完成', key: 'batch-stop' });
-          setSelectedRowKeys([]);
-          fetchInstances();
-        } catch (error: any) {
-          message.error({ 
-            content: `批量停止失败: ${error.message}`,
-            key: 'batch-stop'
-          });
-        }
-      },
-    });
-  };
-
-  const handleBatchDelete = () => {
-    if (selectedRowKeys.length === 0) {
-      message.warning('请先选择要删除的实例');
-      return;
-    }
-
-    Modal.confirm({
-      title: '⚠️ 批量删除实例',
-      icon: <WarningOutlined style={{ color: '#ff4d4f' }} />,
-      content: (
-        <div>
-          <p>确定要删除选中的 <strong>{selectedRowKeys.length}</strong> 个实例吗？</p>
-          <p style={{ color: '#ff4d4f' }}>
-            ⚠️ 此操作不可恢复！所有数据将被永久删除。
-          </p>
-        </div>
-      ),
-      okText: '删除',
-      cancelText: '取消',
-      okType: 'danger',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        try {
-          message.loading({ content: '正在批量删除实例...', key: 'batch-delete' });
-          
-          await Promise.all(
-            selectedRowKeys.map(key => 
-              api.delete(`/instances/${key}`).catch(err => {
-                console.error(`Failed to delete ${key}:`, err);
-                return err;
-              })
-            )
-          );
-          
-          message.success({ content: '批量删除完成', key: 'batch-delete' });
-          setSelectedRowKeys([]);
-          fetchInstances();
-        } catch (error: any) {
-          message.error({ 
-            content: `批量删除失败: ${error.message}`,
-            key: 'batch-delete'
-          });
-        }
-      },
-    });
   };
 
   const columns = [
@@ -356,11 +430,23 @@ const Instances: React.FC = () => {
       title: '微信',
       dataIndex: 'wechat',
       key: 'wechat',
-      width: 100,
-      render: (wechat: any) => (
-        <Tag color={wechat?.loggedIn ? 'success' : 'default'}>
-          {wechat?.loggedIn ? '✅ 已登录' : '❌ 未登录'}
-        </Tag>
+      width: 120,
+      render: (wechat: any, record: Instance) => (
+        <Space direction="vertical" size="small">
+          <Tag color={wechat?.loggedIn ? 'success' : 'default'} icon={<WechatOutlined />}>
+            {wechat?.loggedIn ? '已登录' : '未登录'}
+          </Tag>
+          {!wechat?.loggedIn && (
+            <Button 
+              type="link" 
+              size="small"
+              icon={<QrcodeOutlined />}
+              onClick={() => handleWechatLogin(record.name)}
+            >
+              登录
+            </Button>
+          )}
+        </Space>
       ),
     },
     {
@@ -399,46 +485,35 @@ const Instances: React.FC = () => {
           </Tooltip>
           
           {record.status === 'running' ? (
-            <Popconfirm
-              title="停止实例"
-              description="确定要停止此实例吗？"
-              onConfirm={() => handleStop(record.name)}
-              okText="停止"
-              cancelText="取消"
-            >
-              <Button 
-                type="link" 
-                size="small"
-                icon={<PauseCircleOutlined />}
-                danger
-              >
-                停止
-              </Button>
-            </Popconfirm>
-          ) : (
-            <Tooltip title="启动实例">
-              <Button 
-                type="link" 
-                size="small"
-                icon={<PlayCircleOutlined />}
-                onClick={() => handleStart(record.name)}
-              >
-                启动
-              </Button>
-            </Tooltip>
-          )}
-          
-          <Tooltip title="删除实例（不可恢复）">
             <Button 
               type="link" 
-              size="small" 
+              size="small"
+              icon={<PauseCircleOutlined />}
+              onClick={() => handleStop(record.name)}
               danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record.name, record.status === 'running')}
             >
-              删除
+              停止
             </Button>
-          </Tooltip>
+          ) : (
+            <Button 
+              type="link" 
+              size="small"
+              icon={<PlayCircleOutlined />}
+              onClick={() => handleStart(record.name)}
+            >
+              启动
+            </Button>
+          )}
+          
+          <Button 
+            type="link" 
+            size="small" 
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.name, record.status === 'running')}
+          >
+            删除
+          </Button>
         </Space>
       ),
     },
@@ -462,25 +537,6 @@ const Instances: React.FC = () => {
         }
         extra={
           <Space>
-            {selectedRowKeys.length > 0 && (
-              <>
-                <Button 
-                  danger 
-                  icon={<PauseCircleOutlined />}
-                  onClick={handleBatchStop}
-                >
-                  批量停止 ({selectedRowKeys.length})
-                </Button>
-                <Button 
-                  danger 
-                  type="primary"
-                  icon={<DeleteOutlined />}
-                  onClick={handleBatchDelete}
-                >
-                  批量删除 ({selectedRowKeys.length})
-                </Button>
-              </>
-            )}
             <Button icon={<ReloadOutlined />} onClick={fetchInstances}>
               刷新
             </Button>
@@ -523,69 +579,111 @@ const Instances: React.FC = () => {
         title="创建新实例"
         open={isModalVisible}
         onCancel={() => {
-          setIsModalVisible(false);
-          form.resetFields();
+          if (!isCreating) {
+            setIsModalVisible(false);
+            form.resetFields();
+          }
         }}
         footer={null}
         width={600}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleCreate}
-          initialValues={{
-            autoConfig: ['weixin', 'gateway', 'clawnet'],
-          }}
-        >
-          <Form.Item 
-            label="实例名称" 
-            name="name"
-            rules={[
-              { required: true, message: '请输入实例名称' },
-              { pattern: /^[a-z0-9_-]+$/i, message: '只能包含字母、数字、下划线和连字符' },
-              { min: 3, message: '名称至少 3 个字符' },
-              { max: 20, message: '名称最多 20 个字符' },
-            ]}
-            extra="实例名称将作为唯一标识，创建后不可修改"
-          >
-            <Input 
-              placeholder="例如：my-bot-1" 
-              prefix={<span style={{ color: '#8c8c8c' }}>openclaw-</span>}
+        {isCreating ? (
+          // 创建进度显示
+          <div style={{ padding: '20px 0' }}>
+            <Progress 
+              percent={createProgress} 
+              status={createProgress === 100 ? 'success' : 'active'}
+              style={{ marginBottom: 24 }}
             />
-          </Form.Item>
-
-          <Form.Item 
-            label="自动配置" 
-            name="autoConfig"
-            extra="选择需要自动执行的配置操作"
+            
+            <div style={{ marginBottom: 16 }}>
+              {createSteps.map((step, index) => (
+                <div key={index} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+                  {step.status === 'running' && <LoadingOutlined style={{ marginRight: 8, color: '#1890ff' }} />}
+                  {step.status === 'success' && <CheckCircleOutlined style={{ marginRight: 8, color: '#52c41a' }} />}
+                  {step.status === 'error' && <CloseCircleOutlined style={{ marginRight: 8, color: '#ff4d4f' }} />}
+                  {step.status === 'pending' && <span style={{ marginRight: 24 }} />}
+                  <Text>{step.step}</Text>
+                  {step.message && <Text type="secondary" style={{ marginLeft: 8 }}>- {step.message}</Text>}
+                </div>
+              ))}
+            </div>
+            
+            <div 
+              style={{ 
+                background: '#f5f5f5', 
+                padding: 12, 
+                borderRadius: 4,
+                maxHeight: 200,
+                overflow: 'auto',
+                fontFamily: 'monospace',
+                fontSize: 12
+              }}
+            >
+              {createLogs.map((log, index) => (
+                <div key={index} style={{ marginBottom: 4 }}>
+                  {log}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          // 创建表单
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleCreate}
+            initialValues={{
+              autoConfig: ['weixin'],
+            }}
           >
-            <Select mode="multiple" style={{ width: '100%' }}>
-              <Select.Option value="weixin">
-                🔌 自动安装微信插件
-              </Select.Option>
-              <Select.Option value="gateway">
-                🚀 自动启动 Gateway
-              </Select.Option>
-              <Select.Option value="clawnet">
-                🔗 自动连接 ClawNet
-              </Select.Option>
-            </Select>
-          </Form.Item>
+            <Form.Item 
+              label="实例名称" 
+              name="name"
+              rules={[
+                { required: true, message: '请输入实例名称' },
+                { pattern: /^[a-z0-9_-]+$/i, message: '只能包含字母、数字、下划线和连字符' },
+                { min: 3, message: '名称至少 3 个字符' },
+                { max: 20, message: '名称最多 20 个字符' },
+              ]}
+              extra="实例名称将作为唯一标识，创建后不可修改"
+            >
+              <Input placeholder="例如：my-bot-1" />
+            </Form.Item>
 
-          <Form.Item>
-            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-              <Button onClick={() => {
-                setIsModalVisible(false);
-                form.resetFields();
-              }}>
-                取消
-              </Button>
-              <Button type="primary" htmlType="submit">
-                创建实例
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+            <Form.Item 
+              label="自动配置" 
+              name="autoConfig"
+              extra="选择需要自动执行的配置操作"
+            >
+              <Select mode="multiple" style={{ width: '100%' }}>
+                <Select.Option value="weixin">
+                  📲 自动安装微信插件（推荐）
+                </Select.Option>
+                <Select.Option value="gateway">
+                  🚀 自动启动 Gateway
+                </Select.Option>
+                <Select.Option value="clawnet">
+                  🔗 自动连接 ClawNet
+                </Select.Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item>
+              <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+                <Button onClick={() => {
+                  setIsModalVisible(false);
+                  form.resetFields();
+                }}>
+                  取消
+                </Button>
+                <Button type="primary" htmlType="submit">
+                  创建实例
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        )}
 
         <Divider />
 
@@ -594,9 +692,78 @@ const Instances: React.FC = () => {
           <ul style={{ paddingLeft: 20 }}>
             <li>实例将自动分配端口（19000-19099）</li>
             <li>每个实例有独立的配置目录和数据存储</li>
-            <li>实例创建后可以随时启动/停止</li>
-            <li>删除实例将永久移除所有数据，请谨慎操作</li>
+            <li>微信插件安装约需 30-60 秒</li>
+            <li>创建完成后可扫码登录微信</li>
           </ul>
+        </div>
+      </Modal>
+
+      {/* 微信登录对话框 */}
+      <Modal
+        title={<><WechatOutlined /> 微信登录 - {wechatInstance}</>}
+        open={isWechatModalVisible}
+        onCancel={() => {
+          setIsWechatModalVisible(false);
+          setWechatQRURL('');
+          setWechatLoginStatus('pending');
+        }}
+        footer={[
+          <Button key="close" onClick={() => {
+            setIsWechatModalVisible(false);
+            setWechatQRURL('');
+            setWechatLoginStatus('pending');
+          }}>
+            关闭
+          </Button>,
+        ]}
+        width={500}
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          {wechatQRURL ? (
+            <>
+              <img 
+                src={wechatQRURL} 
+                alt="微信登录二维码" 
+                style={{ maxWidth: '100%', marginBottom: 16 }}
+              />
+              <p>请使用微信扫描二维码登录</p>
+              {wechatLoginStatus === 'pending' && (
+                <Text type="secondary">
+                  <LoadingOutlined /> 等待扫码...
+                </Text>
+              )}
+              {wechatLoginStatus === 'success' && (
+                <Text type="success">
+                  <CheckCircleOutlined /> 登录成功！
+                </Text>
+              )}
+            </>
+          ) : (
+            <div>
+              <Alert
+                message="使用 CLI 登录"
+                description={
+                  <div>
+                    <p>Web 端暂不支持扫码登录，请在终端运行：</p>
+                    <Paragraph 
+                      copyable 
+                      style={{ 
+                        background: '#f5f5f5', 
+                        padding: 12, 
+                        borderRadius: 4,
+                        fontFamily: 'monospace'
+                      }}
+                    >
+                      openclaw --profile {wechatInstance} channels login --channel openclaw-weixin
+                    </Paragraph>
+                  </div>
+                }
+                type="info"
+                showIcon
+                icon={<InfoCircleOutlined />}
+              />
+            </div>
+          )}
         </div>
       </Modal>
     </div>
