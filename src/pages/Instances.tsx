@@ -338,11 +338,23 @@ const Instances: React.FC = () => {
     setWechatQRURL('');
     
     try {
-      message.loading({ content: '正在获取微信ClawBot连接二维码...', key: 'wechat' });
+      message.loading({ content: '正在获取微信ClawBot连接信息...', key: 'wechat' });
       
-      // 获取连接二维码 - 使用GET请求
+      // 获取连接信息
       const response = await api.get(`/instances/${instanceName}/wechat/qrcode`);
       
+      // Web端暂不支持直接扫码，显示CLI命令
+      if (!response.data.success && response.data.fallback) {
+        setWechatLoginStatus('pending');
+        message.info({ 
+          content: '请在终端中使用命令连接',
+          key: 'wechat',
+          duration: 5
+        });
+        return;
+      }
+      
+      // 如果后端支持二维码（未来功能）
       if (response.data.success && response.data.data?.qrUrl) {
         setWechatQRURL(response.data.data.qrUrl);
         message.success({ content: '请扫描二维码连接', key: 'wechat' });
@@ -373,19 +385,11 @@ const Instances: React.FC = () => {
             message.warning('连接超时，请重试');
           }
         }, 60000);
-      } else {
-        // 如果没有二维码 URL，显示提示
-        setWechatLoginStatus('pending');
-        message.info({ 
-          content: '请在终端运行以下命令进行微信ClawBot连接：',
-          key: 'wechat',
-          duration: 5
-        });
       }
     } catch (error: any) {
-      console.error('Failed to get WeChat QR:', error);
+      console.error('Failed to get WeChat connection info:', error);
       message.error({ 
-        content: `获取二维码失败: ${error.response?.data?.error || error.message}`,
+        content: `获取连接信息失败: ${error.response?.data?.error || error.message}`,
         key: 'wechat'
       });
       setWechatLoginStatus('failed');
@@ -716,11 +720,12 @@ const Instances: React.FC = () => {
             关闭
           </Button>,
         ]}
-        width={500}
+        width={600}
       >
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+        <div style={{ padding: '10px 0' }}>
           {wechatQRURL ? (
-            <>
+            // 如果有二维码URL（未来支持）
+            <div style={{ textAlign: 'center' }}>
               <img 
                 src={wechatQRURL} 
                 alt="微信ClawBot连接二维码" 
@@ -737,25 +742,72 @@ const Instances: React.FC = () => {
                   <CheckCircleOutlined /> 连接成功！
                 </Text>
               )}
-            </>
+            </div>
           ) : (
+            // CLI连接方式（当前推荐）
             <div>
               <Alert
-                message="使用 CLI 连接"
+                message="使用终端命令连接"
                 description={
                   <div>
-                    <p>Web 端暂不支持扫码连接，请在终端运行：</p>
-                    <Paragraph 
-                      copyable 
-                      style={{ 
-                        background: '#f5f5f5', 
-                        padding: 12, 
-                        borderRadius: 4,
-                        fontFamily: 'monospace'
-                      }}
-                    >
-                      openclaw --profile {wechatInstance} channels login --channel openclaw-weixin
-                    </Paragraph>
+                    <p style={{ marginBottom: 12 }}>
+                      微信ClawBot连接需要通过终端完成，请按以下步骤操作：
+                    </p>
+                    
+                    <div style={{ marginBottom: 16 }}>
+                      <Text strong>第1步：复制命令</Text>
+                      <Paragraph 
+                        copyable={{ text: `openclaw --profile ${wechatInstance} channels login --channel openclaw-weixin` }}
+                        style={{ 
+                          background: '#f5f5f5', 
+                          padding: 12, 
+                          borderRadius: 4,
+                          fontFamily: 'monospace',
+                          marginTop: 8
+                        }}
+                      >
+                        openclaw --profile {wechatInstance} channels login --channel openclaw-weixin
+                      </Paragraph>
+                    </div>
+                    
+                    <div style={{ marginBottom: 16 }}>
+                      <Text strong>第2步：在终端中执行</Text>
+                      <ul style={{ marginTop: 8, paddingLeft: 20, color: '#666' }}>
+                        <li>打开终端（Terminal）</li>
+                        <li>粘贴并执行上述命令</li>
+                        <li>等待二维码在终端显示</li>
+                      </ul>
+                    </div>
+                    
+                    <div style={{ marginBottom: 16 }}>
+                      <Text strong>第3步：扫描二维码</Text>
+                      <ul style={{ marginTop: 8, paddingLeft: 20, color: '#666' }}>
+                        <li>打开微信 → 发现 → 扫一扫</li>
+                        <li>扫描终端中显示的二维码</li>
+                        <li>如果二维码不清晰，命令会输出URL</li>
+                        <li>可在浏览器中打开URL查看高清二维码</li>
+                      </ul>
+                    </div>
+                    
+                    <div style={{ marginBottom: 16 }}>
+                      <Text strong>第4步：完成连接</Text>
+                      <ul style={{ marginTop: 8, paddingLeft: 20, color: '#666' }}>
+                        <li>按照微信提示完成授权</li>
+                        <li>终端显示"✅ 连接成功"</li>
+                        <li>关闭此对话框并刷新页面查看状态</li>
+                      </ul>
+                    </div>
+                    
+                    <Divider />
+                    
+                    <div style={{ background: '#e6f7ff', padding: 12, borderRadius: 4 }}>
+                      <Text strong>💡 提示</Text>
+                      <ul style={{ marginTop: 8, paddingLeft: 20, marginBottom: 0 }}>
+                        <li>微信登录是一次性操作，使用CLI更可靠</li>
+                        <li>连接成功后，ClawBot会自动保持在线</li>
+                        <li>如需重新连接，再次运行命令即可</li>
+                      </ul>
+                    </div>
                   </div>
                 }
                 type="info"
