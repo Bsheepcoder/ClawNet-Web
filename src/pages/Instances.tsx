@@ -131,23 +131,17 @@ const Instances: React.FC = () => {
   // 获取 Gateway 状态
   const fetchGatewayStatus = async () => {
     try {
-      // 检测本地 Gateway
-      const response = await fetch('http://localhost:18789', {
-        method: 'GET',
-        signal: AbortSignal.timeout(3000) // 3 秒超时
-      });
+      // 通过 ClawNet 后端代理检测 Gateway
+      const response = await api.get('/gateway/status');
+      const data = response.data;
       
-      if (response.ok) {
-        setGatewayStatus({
-          connected: true,
-          url: 'http://localhost:18789',
-          port: 18789,
-          lastChecked: new Date().toLocaleTimeString(),
-          version: 'OpenClaw Gateway'
-        });
-      } else {
-        throw new Error('Gateway not responding');
-      }
+      setGatewayStatus({
+        connected: data.connected || false,
+        url: data.url || 'http://localhost:18789',
+        port: data.port || 18789,
+        lastChecked: new Date().toLocaleTimeString(),
+        version: data.version
+      });
     } catch (error) {
       setGatewayStatus({
         connected: false,
