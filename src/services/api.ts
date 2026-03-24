@@ -1,20 +1,19 @@
 import axios from 'axios';
 
-// 开发环境使用代理，生产环境使用实际地址
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-const DEFAULT_TOKEN = 'clawnet-secret-token'; // 默认 Token
+const API_BASE_URL = '/api';
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// 请求拦截器 - 添加 Token
+// 请求拦截器 - 添加 token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('clawnet_token') || DEFAULT_TOKEN;
+    const token = localStorage.getItem('clawnet-token') || 'clawnet-secret-token';
     config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
@@ -30,9 +29,7 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Token 过期，跳转到登录页
-      localStorage.removeItem('clawnet_token');
-      window.location.href = '/login';
+      console.error('认证失败，请检查 token');
     }
     return Promise.reject(error);
   }
