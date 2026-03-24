@@ -79,6 +79,21 @@ const Instances: React.FC = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [form] = Form.useForm();
   
+  // Gateway 状态
+  const [gatewayStatus, setGatewayStatus] = useState<{
+    connected: boolean;
+    url: string;
+    port: number;
+    lastChecked: string;
+    version?: string;
+    uptime?: number;
+  }>({
+    connected: false,
+    url: 'http://localhost:18789',
+    port: 18789,
+    lastChecked: '-'
+  });
+  
   // 创建进度相关状态
   const [isCreating, setIsCreating] = useState(false);
   const [createProgress, setCreateProgress] = useState(0);
@@ -105,9 +120,43 @@ const Instances: React.FC = () => {
 
   useEffect(() => {
     fetchInstances();
-    const interval = setInterval(fetchInstances, 30000);
+    fetchGatewayStatus();
+    const interval = setInterval(() => {
+      fetchInstances();
+      fetchGatewayStatus();
+    }, 10000); // 每 10 秒检测一次
     return () => clearInterval(interval);
   }, []);
+
+  // 获取 Gateway 状态
+  const fetchGatewayStatus = async () => {
+    try {
+      // 检测本地 Gateway
+      const response = await fetch('http://localhost:18789', {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000) // 3 秒超时
+      });
+      
+      if (response.ok) {
+        setGatewayStatus({
+          connected: true,
+          url: 'http://localhost:18789',
+          port: 18789,
+          lastChecked: new Date().toLocaleTimeString(),
+          version: 'OpenClaw Gateway'
+        });
+      } else {
+        throw new Error('Gateway not responding');
+      }
+    } catch (error) {
+      setGatewayStatus({
+        connected: false,
+        url: 'http://localhost:18789',
+        port: 18789,
+        lastChecked: new Date().toLocaleTimeString()
+      });
+    }
+  };
 
   const fetchInstances = async () => {
     setLoading(true);
@@ -663,10 +712,77 @@ const Instances: React.FC = () => {
 
   return (
     <div>
+      {/* Gateway 状态卡片 */}
+      <Card 
+        style={{ marginBottom: 16 }}
+        bodyStyle={{ padding: '16px 24px' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Space size="large">
+            <div>
+              <Text strong style={{ fontSize: 16 }}>
+                🌐 OpenClaw Gateway
+              </Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {gatewayStatus.url}
+              </Text>
+            </div>
+            
+            <Divider type="vertical" style={{ height: 40 }} />
+            
+            <div>
+              <Text type="secondary" style={{ fontSize: 12 }}>状态</Text>
+              <br />
+              <Tag 
+                icon={gatewayStatus.connected ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                color={gatewayStatus.connected ? 'success' : 'error'}
+                style={{ fontSize: 13, padding: '2px 8px' }}
+              >
+                {gatewayStatus.connected ? '已连接' : '未连接'}
+              </Tag>
+            </div>
+            
+            <Divider type="vertical" style={{ height: 40 }} />
+            
+            <div>
+              <Text type="secondary" style={{ fontSize: 12 }}>端口</Text>
+              <br />
+              <Text strong>{gatewayStatus.port}</Text>
+            </div>
+            
+            <Divider type="vertical" style={{ height: 40 }} />
+            
+            <div>
+              <Text type="secondary" style={{ fontSize: 12 }}>最后检测</Text>
+              <br />
+              <Text>{gatewayStatus.lastChecked}</Text>
+            </div>
+          </Space>
+          
+          <Space>
+            <Button 
+              icon={<LinkOutlined />}
+              onClick={() => window.open(gatewayStatus.url, '_blank')}
+              disabled={!gatewayStatus.connected}
+            >
+              打开 Gateway
+            </Button>
+            <Button 
+              icon={<ReloadOutlined />}
+              onClick={fetchGatewayStatus}
+            >
+              重新检测
+            </Button>
+          </Space>
+        </div>
+      </Card>
+
+      {/* 实例管理卡片 */}
       <Card
         title={
           <Space>
-            <span>📦 实例管理</span>
+            <span>📦 Gateway 下的实例</span>
             <Badge count={instances.filter(i => i.status === 'running').length} 
                    style={{ backgroundColor: '#52c41a' }}
                    title="运行中的实例" />
@@ -681,12 +797,23 @@ const Instances: React.FC = () => {
               type="primary" 
               icon={<PlusOutlined />}
               onClick={() => setIsModalVisible(true)}
+              disabled={!gatewayStatus.connected}
             >
               创建实例
             </Button>
           </Space>
         }
       >
+        {!gatewayStatus.connected && (
+          <Alert
+            message="Gateway 未连接"
+            description="无法连接到 OpenClaw Gateway，请确保 Gateway 正在运行。实例管理功能可能不可用。"
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        
         <div style={{ marginBottom: 16 }}>
           <Space>
             <InfoCircleOutlined style={{ color: '#1890ff' }} />
