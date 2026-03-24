@@ -31,6 +31,25 @@ interface InstanceData {
     nodeId?: string;
   };
   createdAt: string;
+  // 新增配置信息
+  config?: {
+    model?: {
+      primary: string;
+      fallbacks: string[];
+    };
+    workspace?: string;
+    channels?: string[];
+    plugins?: string[];
+    clawnet?: {
+      forwardWechat: boolean;
+      endpoint: string;
+    };
+    gateway?: {
+      shared: boolean;
+      port: number;
+      bind: string;
+    };
+  };
 }
 
 const InstanceDetail: React.FC = () => {
@@ -164,41 +183,120 @@ const InstanceDetail: React.FC = () => {
                   </Row>
 
                   <Descriptions bordered column={2}>
-                    <Descriptions.Item label="实例 ID">{instance.id}</Descriptions.Item>
-                    <Descriptions.Item label="端口">{instance.port}</Descriptions.Item>
+                    <Descriptions.Item label="实例名称">{instance.name}</Descriptions.Item>
                     <Descriptions.Item label="状态">
                       <Tag color={instance.status === 'running' ? 'success' : 'default'}>
-                        {instance.status === 'running' ? '运行中' : '已停止'}
+                        {instance.status === 'running' ? '✅ 运行中' : '⏸️ 已停止'}
                       </Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Gateway PID">
-                      {instance.gateway?.pid || '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="微信状态">
+                    <Descriptions.Item label="Gateway">
                       <Space>
-                        <WechatOutlined />
-                        <Tag color={instance.wechat?.loggedIn ? 'success' : 'default'}>
-                          {instance.wechat?.loggedIn ? '已登录' : '未登录'}
-                        </Tag>
-                      </Space>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="ClawNet">
-                      <Space>
-                        <ApiOutlined />
-                        <Tag color={instance.clawnet?.connected ? 'success' : 'default'}>
-                          {instance.clawnet?.connected ? '已连接' : '未连接'}
-                        </Tag>
-                        {!instance.clawnet?.connected && (
-                          <Button size="small" onClick={handleConnect}>
-                            连接
-                          </Button>
-                        )}
+                        <Tag color="blue">共享 Gateway</Tag>
+                        <span>:18789</span>
                       </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="创建时间">
                       {new Date(instance.createdAt).toLocaleString('zh-CN')}
                     </Descriptions.Item>
                   </Descriptions>
+
+                  {/* 模型配置 */}
+                  <Card title="🤖 模型配置" size="small" style={{ marginTop: 16 }}>
+                    <Descriptions bordered column={1} size="small">
+                      <Descriptions.Item label="主模型">
+                        <Tag color="blue">{instance.config?.model?.primary || '未配置'}</Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="备用模型">
+                        <Space wrap>
+                          {instance.config?.model?.fallbacks?.map((model, idx) => (
+                            <Tag key={idx}>{model}</Tag>
+                          )) || <span style={{color: '#999'}}>无</span>}
+                        </Space>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="工作空间">
+                        <code>{instance.config?.workspace || '未配置'}</code>
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Card>
+
+                  {/* 插件列表 */}
+                  <Card title="🔌 插件列表" size="small" style={{ marginTop: 16 }}>
+                    {instance.config?.plugins?.length ? (
+                      <Space wrap>
+                        {instance.config.plugins.map((plugin, idx) => (
+                          <Tag key={idx} color="green">{plugin}</Tag>
+                        ))}
+                      </Space>
+                    ) : (
+                      <span style={{color: '#999'}}>无插件</span>
+                    )}
+                  </Card>
+
+                  {/* 通道配置 */}
+                  <Card title="📡 通道配置" size="small" style={{ marginTop: 16 }}>
+                    {instance.config?.channels?.length ? (
+                      <Space wrap>
+                        {instance.config.channels.map((channel, idx) => (
+                          <Tag key={idx} color="purple">{channel.toUpperCase()}</Tag>
+                        ))}
+                      </Space>
+                    ) : (
+                      <span style={{color: '#999'}}>无通道配置</span>
+                    )}
+                  </Card>
+
+                  {/* ClawNet 配置 */}
+                  <Card title="🌐 ClawNet 配置" size="small" style={{ marginTop: 16 }}>
+                    <Descriptions bordered column={1} size="small">
+                      <Descriptions.Item label="微信消息转发">
+                        {instance.config?.clawnet?.forwardWechat ? (
+                          <Tag color="success">✅ 已启用</Tag>
+                        ) : (
+                          <Tag>❌ 未启用</Tag>
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="转发端点">
+                        <code>{instance.config?.clawnet?.endpoint || '未配置'}</code>
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Card>
+
+                  {/* 微信状态 */}
+                  <Card title="💬 微信状态" size="small" style={{ marginTop: 16 }}>
+                    <Descriptions bordered column={1} size="small">
+                      <Descriptions.Item label="登录状态">
+                        <Space>
+                          <WechatOutlined />
+                          <Tag color={instance.wechat?.loggedIn ? 'success' : 'default'}>
+                            {instance.wechat?.loggedIn ? '✅ 已登录' : '❌ 未登录'}
+                          </Tag>
+                        </Space>
+                      </Descriptions.Item>
+                      {instance.wechat?.accountId && (
+                        <Descriptions.Item label="账号 ID">
+                          {instance.wechat.accountId}
+                        </Descriptions.Item>
+                      )}
+                    </Descriptions>
+                  </Card>
+
+                  {/* ClawNet 连接状态 */}
+                  <Card title="🔗 ClawNet 连接" size="small" style={{ marginTop: 16 }}>
+                    <Space>
+                      <ApiOutlined />
+                      <Tag color={instance.clawnet?.connected ? 'success' : 'default'}>
+                        {instance.clawnet?.connected ? '✅ 已连接' : '❌ 未连接'}
+                      </Tag>
+                      {instance.clawnet?.nodeId && (
+                        <span>节点: {instance.clawnet.nodeId}</span>
+                      )}
+                      {!instance.clawnet?.connected && (
+                        <Button size="small" type="primary" onClick={handleConnect}>
+                          连接
+                        </Button>
+                      )}
+                    </Space>
+                  </Card>
                 </div>
               ),
             },
