@@ -21,6 +21,7 @@ const Dashboard: React.FC = () => {
     nodes: { total: 0, online: 0 },
     relations: { total: 0, active: 0 },
     messages: { today: 0 },
+    listener: { status: 'unknown', messagesProcessed: 0 },
   });
   const [activities, setActivities] = useState<any[]>([]);
   const [instances, setInstances] = useState<any[]>([]);
@@ -33,17 +34,19 @@ const Dashboard: React.FC = () => {
     setLoading(true);
     try {
       // 并行请求所有数据，但每个都独立捕获错误
-      const [healthRes, instancesRes, nodesRes, relationsRes] = await Promise.all([
+      const [healthRes, instancesRes, nodesRes, relationsRes, listenerRes] = await Promise.all([
         api.get('/health').catch(() => ({ data: { stats: { nodes: 0, relations: 0 } } })),
         api.get('/instances').catch(() => ({ data: { data: [] } })),
         api.get('/nodes').catch(() => ({ data: { data: [] } })),
         api.get('/relations').catch(() => ({ data: { data: [] } })),
+        api.get('/wechat-listener/status').catch(() => ({ data: { status: 'offline' } })),
       ]);
 
       const health = healthRes.data || {};
       const instancesData = instancesRes.data?.data || [];
       const nodesData = nodesRes.data?.data || [];
       const relationsData = relationsRes.data?.data || [];
+      const listenerData = listenerRes.data || { status: 'unknown' };
 
       setStats({
         instances: {
@@ -60,6 +63,10 @@ const Dashboard: React.FC = () => {
         },
         messages: {
           today: Math.floor(Math.random() * 1000) + 100,
+        },
+        listener: {
+          status: listenerData.status || 'unknown',
+          messagesProcessed: listenerData.stats?.messagesProcessed || 0,
         },
       });
 
@@ -154,6 +161,38 @@ const Dashboard: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* 监听器状态 */}
+      <Card 
+        title="🎧 微信监听器状态" 
+        style={{ marginBottom: 24 }}
+        extra={
+          <Tag color={stats.listener.status === 'running' ? 'success' : 'error'}>
+            {stats.listener.status === 'running' ? '✅ 运行中' : '❌ 未运行'}
+          </Tag>
+        }
+      >
+        <Row gutter={16}>
+          <Col span={12}>
+            <Statistic
+              title="状态"
+              value={stats.listener.status === 'running' ? '正常' : '离线'}
+              valueStyle={{ 
+                color: stats.listener.status === 'running' ? '#52c41a' : '#ff4d4f',
+                fontSize: 20 
+              }}
+            />
+          </Col>
+          <Col span={12}>
+            <Statistic
+              title="已处理消息"
+              value={stats.listener.messagesProcessed}
+              suffix="条"
+              valueStyle={{ color: '#1890ff', fontSize: 20 }}
+            />
+          </Col>
+        </Row>
+      </Card>
 
       {/* 快速操作 */}
       <Card title="🚀 快速操作" style={{ marginBottom: 24 }}>

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClawNet Test</title>
+  </head>
+  <body>
+    <div id="root" style="padding: 20px; font-family: sans-serif;">
+      <h1>ClawNet Web</h1>
+      <p>If you see this, the server is working correctly.</p>
+      <p>Time: <span id="time"></span></p>
+      <p><a href="/">Go to App</a></p>
+    </div>
+    <script>
+      document.getElementById('time').textContent = new Date().toLocaleString();
+    </script>
+  </body>
+</html>

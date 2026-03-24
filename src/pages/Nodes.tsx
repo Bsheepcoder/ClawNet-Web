@@ -27,23 +27,11 @@ import dayjs from 'dayjs';
 
 interface Node {
   id: string;
-  type: 'instance' | 'bot' | 'user' | 'agent' | 'service';
+  type: 'gateway' | 'bot' | 'user' | 'agent' | 'service';
   name: string;
   status: 'online' | 'offline' | 'running' | 'stopped';
   metadata?: {
-    // 实例特有字段
     port?: number;
-    wechat?: {
-      loggedIn: boolean;
-      accountId?: string;
-    };
-    gateway?: {
-      running: boolean;
-    };
-    clawnet?: {
-      connected: boolean;
-    };
-    // 通用字段
     description?: string;
     [key: string]: any;
   };
@@ -67,39 +55,17 @@ const Nodes: React.FC = () => {
   const fetchNodes = async () => {
     setLoading(true);
     try {
-      // 1. 获取普通节点
+      // 只获取节点数据（不包括实例）
+      // 一个实例对应一个节点，节点是通信单位
       const nodesRes = await api.get('/nodes').catch(() => ({ data: { data: [] } }));
       
-      // 2. 获取实例（实例也是节点）
-      const instancesRes = await api.get('/instances').catch(() => ({ data: { data: [] } }));
-      
-      // 3. 合并数据：将实例转换为节点
-      const normalNodes = (nodesRes.data?.data || []).map((node: any) => ({
+      const nodeList = (nodesRes.data?.data || []).map((node: any) => ({
         ...node,
         type: node.type || 'bot',
         status: node.status || 'offline',
       }));
-
-      const instanceNodes = (instancesRes.data?.data || []).map((instance: any) => ({
-        id: instance.id,
-        type: 'instance' as const,
-        name: instance.name,
-        status: instance.status === 'running' ? 'running' : 'stopped',
-        metadata: {
-          port: instance.port,
-          wechat: instance.wechat,
-          gateway: instance.gateway,
-          clawnet: instance.clawnet,
-        },
-        createdAt: instance.createdAt,
-        updatedAt: instance.updatedAt,
-      }));
-
-      // 4. 合并并去重
-      const allNodes = [...instanceNodes, ...normalNodes];
-      setNodes(allNodes);
       
-      message.success(`加载了 ${allNodes.length} 个节点（含 ${instanceNodes.length} 个实例）`);
+      setNodes(nodeList);
     } catch (error) {
       console.error('Failed to fetch nodes:', error);
       message.error('加载节点失败');
@@ -157,7 +123,7 @@ const Nodes: React.FC = () => {
 
   const getTypeTag = (type: string) => {
     const typeMap: Record<string, { color: string; icon: React.ReactNode; text: string }> = {
-      instance: { color: 'purple', icon: <CloudServerOutlined />, text: '实例' },
+      gateway: { color: 'gold', icon: <CloudServerOutlined />, text: 'Gateway' },
       bot: { color: 'purple', icon: <ApiOutlined />, text: '机器人' },
       user: { color: 'blue', icon: '👤', text: '用户' },
       agent: { color: 'green', icon: '🤖', text: '代理' },
@@ -213,37 +179,6 @@ const Nodes: React.FC = () => {
       render: (status: string) => getStatusBadge(status),
     },
     {
-      title: '端口',
-      dataIndex: ['metadata', 'port'],
-      key: 'port',
-      width: 80,
-      render: (port?: number) => port || '-',
-    },
-    {
-      title: '微信',
-      dataIndex: ['metadata', 'wechat', 'loggedIn'],
-      key: 'wechat',
-      width: 100,
-      render: (loggedIn?: boolean) => 
-        loggedIn !== undefined ? (
-          <Tag color={loggedIn ? 'success' : 'default'} icon={<WechatOutlined />}>
-            {loggedIn ? '已登录' : '未登录'}
-          </Tag>
-        ) : '-',
-    },
-    {
-      title: 'ClawNet',
-      dataIndex: ['metadata', 'clawnet', 'connected'],
-      key: 'clawnet',
-      width: 100,
-      render: (connected?: boolean) => 
-        connected !== undefined ? (
-          <Tag color={connected ? 'success' : 'default'} icon={<ApiOutlined />}>
-            {connected ? '已连接' : '未连接'}
-          </Tag>
-        ) : '-',
-    },
-    {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
@@ -263,19 +198,15 @@ const Nodes: React.FC = () => {
           >
             详情
           </Button>
-          {record.type !== 'instance' && (
-            <>
-              <Button type="link" size="small">编辑</Button>
-              <Button 
-                type="link" 
-                size="small" 
-                danger
-                onClick={() => handleDeleteNode(record)}
-              >
-                删除
-              </Button>
-            </>
-          )}
+          <Button type="link" size="small">编辑</Button>
+          <Button 
+            type="link" 
+            size="small" 
+            danger
+            onClick={() => handleDeleteNode(record)}
+          >
+            删除
+          </Button>
         </Space>
       ),
     },
@@ -288,9 +219,6 @@ const Nodes: React.FC = () => {
           <Space>
             <span>节点管理</span>
             <Tag color="blue">{nodes.length} 个节点</Tag>
-            <Tag color="purple">
-              {nodes.filter(n => n.type === 'instance').length} 个实例
-            </Tag>
           </Space>
         }
         extra={
@@ -301,7 +229,7 @@ const Nodes: React.FC = () => {
               style={{ width: 150 }}
             >
               <Select.Option value="all">全部节点</Select.Option>
-              <Select.Option value="instance">实例节点</Select.Option>
+              <Select.Option value="gateway">Gateway</Select.Option>
               <Select.Option value="bot">机器人</Select.Option>
               <Select.Option value="user">用户</Select.Option>
               <Select.Option value="agent">代理</Select.Option>

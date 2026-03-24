@@ -499,8 +499,11 @@ const Instances: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       width: 150,
-      render: (name: string) => (
-        <a onClick={() => navigate(`/instances/${name}`)}>{name}</a>
+      render: (name: string, record: Instance) => (
+        <Space>
+          {record.isMain && <Tag color="blue">主</Tag>}
+          <a onClick={() => navigate(`/instances/${name}`)}>{name}</a>
+        </Space>
       ),
     },
     {

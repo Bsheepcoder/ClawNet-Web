@@ -28,16 +28,16 @@
   },
   "homepage": "https://github.com/Bsheepcoder/ClawNet-Web#readme",
   "dependencies": {
+    "@ant-design/icons": "^5.3.0",
+    "@antv/g6": "^4.8.25",
+    "antd": "^5.15.0",
+    "axios": "^1.6.0",
+    "dayjs": "^1.11.10",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
-    "antd": "^5.15.0",
-    "@ant-design/icons": "^5.3.0",
-    "zustand": "^4.5.0",
-    "axios": "^1.6.0",
     "socket.io-client": "^4.7.0",
-    "dayjs": "^1.11.10",
-    "@antv/g6": "^4.8.24"
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
