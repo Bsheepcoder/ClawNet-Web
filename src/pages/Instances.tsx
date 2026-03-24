@@ -542,8 +542,8 @@ const Instances: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       width: 150,
-      render: (name: string) => (
-        <a onClick={() => navigate(`/instances/${name}`)}>{name}</a>
+      render: (name: string, record: Instance) => (
+        <a onClick={() => navigate(`/instances/${record.id}`)}>{name}</a>
       ),
     },
     {
@@ -585,7 +585,7 @@ const Instances: React.FC = () => {
               type="link" 
               size="small"
               icon={<QrcodeOutlined />}
-              onClick={() => handleWechatLogin(record.name)}
+              onClick={() => handleWechatLogin(record.id)}
             >
               连接
             </Button>
@@ -622,7 +622,7 @@ const Instances: React.FC = () => {
             <Button 
               type="link" 
               size="small"
-              onClick={() => navigate(`/instances/${record.name}`)}
+              onClick={() => navigate(`/instances/${record.id}`)}
             >
               详情
             </Button>
@@ -633,7 +633,7 @@ const Instances: React.FC = () => {
               type="link" 
               size="small"
               icon={<PauseCircleOutlined />}
-              onClick={() => handleStop(record.name)}
+              onClick={() => handleStop(record.id)}
               danger
             >
               停止
@@ -643,7 +643,7 @@ const Instances: React.FC = () => {
               type="link" 
               size="small"
               icon={<PlayCircleOutlined />}
-              onClick={() => handleStart(record.name)}
+              onClick={() => handleStart(record.id)}
             >
               启动
             </Button>
@@ -672,7 +672,7 @@ const Instances: React.FC = () => {
                   if (record.status !== 'running') {
                     message.warning('请先启动实例');
                   } else {
-                    handleConnectToClawnet(record.name);
+                    handleConnectToClawnet(record.id);
                   }
                 }}
                 style={{ color: record.status !== 'running' ? '#8c8c8c' : '#1890ff' }}
@@ -687,7 +687,7 @@ const Instances: React.FC = () => {
             size="small" 
             danger
             icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.name, record.status === 'running')}
+            onClick={() => handleDelete(record.id, record.status === 'running')}
           >
             删除
           </Button>
