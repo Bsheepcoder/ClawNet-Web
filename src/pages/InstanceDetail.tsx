@@ -302,14 +302,175 @@ const InstanceDetail: React.FC = () => {
             },
             {
               key: 'config',
-              label: '配置',
+              label: '📝 配置编辑',
               children: (
-                <Alert
-                  message="配置功能"
-                  description="实例配置编辑功能开发中..."
-                  type="info"
-                  showIcon
-                />
+                <div>
+                  <Alert
+                    message="配置修改后需要重启实例才能生效"
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                  />
+                  
+                  {/* 模型配置 */}
+                  <Card title="🤖 模型配置" size="small" style={{ marginBottom: 16 }}>
+                    <Descriptions bordered column={1} size="small">
+                      <Descriptions.Item label="主模型">
+                        <Tag color="blue">{instance.config?.model?.primary || '未配置'}</Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="备用模型">
+                        <Space wrap>
+                          {instance.config?.model?.fallbacks?.map((model, idx) => (
+                            <Tag key={idx}>{model}</Tag>
+                          )) || <span style={{color: '#999'}}>无</span>}
+                        </Space>
+                      </Descriptions.Item>
+                    </Descriptions>
+                    <Button size="small" style={{ marginTop: 8 }} onClick={() => message.info('配置编辑功能开发中')}>
+                      编辑模型配置
+                    </Button>
+                  </Card>
+
+                  {/* ClawNet 配置 */}
+                  <Card title="🌐 ClawNet 配置" size="small" style={{ marginBottom: 16 }}>
+                    <Descriptions bordered column={1} size="small">
+                      <Descriptions.Item label="微信消息转发">
+                        {instance.config?.clawnet?.forwardWechat ? (
+                          <Tag color="success">✅ 已启用</Tag>
+                        ) : (
+                          <Tag>❌ 未启用</Tag>
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="转发端点">
+                        <code>{instance.config?.clawnet?.endpoint || '未配置'}</code>
+                      </Descriptions.Item>
+                    </Descriptions>
+                    <Button size="small" style={{ marginTop: 8 }} onClick={() => message.info('配置编辑功能开发中')}>
+                      编辑 ClawNet 配置
+                    </Button>
+                  </Card>
+
+                  {/* 通道配置 */}
+                  <Card title="📡 通道配置" size="small" style={{ marginBottom: 16 }}>
+                    {instance.config?.channels?.length ? (
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        {instance.config.channels.includes('telegram') && (
+                          <div>
+                            <Tag color="purple">Telegram</Tag>
+                            <Button size="small" type="link">配置</Button>
+                          </div>
+                        )}
+                        {instance.config.channels.includes('wechat') && (
+                          <div>
+                            <Tag color="green">微信</Tag>
+                            <Button size="small" type="link">配置</Button>
+                          </div>
+                        )}
+                      </Space>
+                    ) : (
+                      <span style={{color: '#999'}}>无通道配置</span>
+                    )}
+                  </Card>
+
+                  {/* Gateway 配置 */}
+                  <Card title="🌐 Gateway 配置" size="small">
+                    <Descriptions bordered column={1} size="small">
+                      <Descriptions.Item label="共享模式">
+                        <Tag color={instance.config?.gateway?.shared ? 'blue' : 'green'}>
+                          {instance.config?.gateway?.shared ? '共享主 Gateway' : '独立 Gateway'}
+                        </Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="端口">
+                        {instance.config?.gateway?.port || 18789}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="绑定模式">
+                        {instance.config?.gateway?.bind || 'lan'}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Card>
+                </div>
+              ),
+            },
+            {
+              key: 'extensions',
+              label: '🔌 扩展管理',
+              children: (
+                <div>
+                  {/* 微信插件 */}
+                  <Card 
+                    title={
+                      <Space>
+                        <span>📱 微信插件</span>
+                        <Tag color="green">openclaw-weixin</Tag>
+                      </Space>
+                    }
+                    size="small"
+                    style={{ marginBottom: 16 }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <div>
+                        <Text strong>版本: </Text>
+                        <Tag>1.0.3</Tag>
+                      </div>
+                      
+                      <div>
+                        <Text strong>状态: </Text>
+                        <Tag color={instance.wechat?.loggedIn ? 'success' : 'default'}>
+                          {instance.wechat?.loggedIn ? '✅ 已登录' : '❌ 未登录'}
+                        </Tag>
+                      </div>
+                      
+                      {instance.wechat?.accountId && (
+                        <div>
+                          <Text strong>账号 ID: </Text>
+                          <Text code>{instance.wechat.accountId}</Text>
+                        </div>
+                      )}
+                      
+                      <Divider style={{ margin: '12px 0' }} />
+                      
+                      <Space>
+                        <Text strong>启用状态: </Text>
+                        <Tag color={instance.config?.plugins?.includes('openclaw-weixin') ? 'success' : 'default'}>
+                          {instance.config?.plugins?.includes('openclaw-weixin') ? '✅ 已启用' : '❌ 已禁用'}
+                        </Tag>
+                      </Space>
+                    </Space>
+                  </Card>
+
+                  {/* OpenViking 扩展 */}
+                  <Card 
+                    title={
+                      <Space>
+                        <span>🧠 OpenViking</span>
+                        <Tag>记忆系统适配器</Tag>
+                      </Space>
+                    }
+                    size="small"
+                    style={{ marginBottom: 16 }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <div>
+                        <Text strong>状态: </Text>
+                        <Tag>❌ 未安装</Tag>
+                      </div>
+                      
+                      <Button type="dashed" block onClick={() => message.info('插件安装功能开发中')}>
+                        安装 OpenViking 扩展
+                      </Button>
+                    </Space>
+                  </Card>
+
+                  {/* 安装新插件 */}
+                  <Card title="安装新插件" size="small">
+                    <Alert
+                      message="高级功能"
+                      description="插件管理功能需要管理员权限，请联系系统管理员"
+                      type="info"
+                      showIcon
+                    />
+                  </Card>
+                </div>
               ),
             },
             {
