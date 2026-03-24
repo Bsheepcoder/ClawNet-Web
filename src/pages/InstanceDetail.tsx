@@ -312,42 +312,130 @@ const InstanceDetail: React.FC = () => {
                     style={{ marginBottom: 16 }}
                   />
                   
-                  {/* 模型配置 */}
+                  {/* 模型配置编辑 */}
                   <Card title="🤖 模型配置" size="small" style={{ marginBottom: 16 }}>
-                    <Descriptions bordered column={1} size="small">
-                      <Descriptions.Item label="主模型">
-                        <Tag color="blue">{instance.config?.model?.primary || '未配置'}</Tag>
-                      </Descriptions.Item>
-                      <Descriptions.Item label="备用模型">
-                        <Space wrap>
-                          {instance.config?.model?.fallbacks?.map((model, idx) => (
-                            <Tag key={idx}>{model}</Tag>
-                          )) || <span style={{color: '#999'}}>无</span>}
-                        </Space>
-                      </Descriptions.Item>
-                    </Descriptions>
-                    <Button size="small" style={{ marginTop: 8 }} onClick={() => message.info('配置编辑功能开发中')}>
-                      编辑模型配置
-                    </Button>
+                    <Form layout="vertical">
+                      <Form.Item label="主模型">
+                        <Select
+                          value={instance.config?.model?.primary}
+                          style={{ width: '100%' }}
+                          onChange={async (value) => {
+                            try {
+                              const response = await api.put(`/instances/${instance.id}/config`, {
+                                agents: {
+                                  defaults: {
+                                    model: {
+                                      primary: value,
+                                      fallbacks: instance.config?.model?.fallbacks || []
+                                    }
+                                  }
+                                }
+                              });
+                              if (response.data.success) {
+                                message.success('主模型已更新，需要重启实例生效');
+                                fetchInstance(); // 刷新实例数据
+                              }
+                            } catch (error) {
+                              message.error('更新失败');
+                            }
+                          }}
+                        >
+                          <Select.Option value="zai/glm-5">GLM-5</Select.Option>
+                          <Select.Option value="zai/glm-5-turbo">GLM-5 Turbo</Select.Option>
+                          <Select.Option value="zai/glm-4.7">GLM-4.7</Select.Option>
+                          <Select.Option value="zai/glm-4.7-flash">GLM-4.7 Flash</Select.Option>
+                          <Select.Option value="zai/glm-4.7-flashx">GLM-4.7 FlashX</Select.Option>
+                        </Select>
+                      </Form.Item>
+                      
+                      <Form.Item label="备用模型">
+                        <Select
+                          mode="multiple"
+                          value={instance.config?.model?.fallbacks || []}
+                          style={{ width: '100%' }}
+                          placeholder="选择备用模型"
+                          onChange={async (values) => {
+                            try {
+                              const response = await api.put(`/instances/${instance.id}/config`, {
+                                agents: {
+                                  defaults: {
+                                    model: {
+                                      primary: instance.config?.model?.primary,
+                                      fallbacks: values
+                                    }
+                                  }
+                                }
+                              });
+                              if (response.data.success) {
+                                message.success('备用模型已更新，需要重启实例生效');
+                                fetchInstance();
+                              }
+                            } catch (error) {
+                              message.error('更新失败');
+                            }
+                          }}
+                        >
+                          <Select.Option value="zai/glm-4.7">GLM-4.7</Select.Option>
+                          <Select.Option value="zai/glm-4.6">GLM-4.6</Select.Option>
+                          <Select.Option value="zai/glm-4.5-air">GLM-4.5 Air</Select.Option>
+                          <Select.Option value="zai/glm-4.7-flash">GLM-4.7 Flash</Select.Option>
+                          <Select.Option value="zai/glm-4.7-flashx">GLM-4.7 FlashX</Select.Option>
+                        </Select>
+                      </Form.Item>
+                    </Form>
                   </Card>
 
-                  {/* ClawNet 配置 */}
+                  {/* ClawNet 配置编辑 */}
                   <Card title="🌐 ClawNet 配置" size="small" style={{ marginBottom: 16 }}>
-                    <Descriptions bordered column={1} size="small">
-                      <Descriptions.Item label="微信消息转发">
-                        {instance.config?.clawnet?.forwardWechat ? (
-                          <Tag color="success">✅ 已启用</Tag>
-                        ) : (
-                          <Tag>❌ 未启用</Tag>
-                        )}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="转发端点">
-                        <code>{instance.config?.clawnet?.endpoint || '未配置'}</code>
-                      </Descriptions.Item>
-                    </Descriptions>
-                    <Button size="small" style={{ marginTop: 8 }} onClick={() => message.info('配置编辑功能开发中')}>
-                      编辑 ClawNet 配置
-                    </Button>
+                    <Form layout="vertical">
+                      <Form.Item label="微信消息转发">
+                        <Switch
+                          checked={instance.config?.clawnet?.forwardWechat || false}
+                          onChange={async (checked) => {
+                            try {
+                              const response = await api.put(`/instances/${instance.id}/config`, {
+                                clawnet: {
+                                  forwardWechat: checked,
+                                  endpoint: instance.config?.clawnet?.endpoint || 'http://localhost:19100/message'
+                                }
+                              });
+                              if (response.data.success) {
+                                message.success('微信消息转发配置已更新');
+                                fetchInstance();
+                              }
+                            } catch (error) {
+                              message.error('更新失败');
+                            }
+                          }}
+                        />
+                      </Form.Item>
+                      
+                      <Form.Item label="转发端点">
+                        <Input
+                          value={instance.config?.clawnet?.endpoint || ''}
+                          placeholder="http://localhost:19100/message"
+                          onBlur={async (e) => {
+                            const newEndpoint = e.target.value;
+                            if (newEndpoint !== instance.config?.clawnet?.endpoint) {
+                              try {
+                                const response = await api.put(`/instances/${instance.id}/config`, {
+                                  clawnet: {
+                                    forwardWechat: instance.config?.clawnet?.forwardWechat || false,
+                                    endpoint: newEndpoint
+                                  }
+                                });
+                                if (response.data.success) {
+                                  message.success('转发端点已更新');
+                                  fetchInstance();
+                                }
+                              } catch (error) {
+                                message.error('更新失败');
+                              }
+                            }
+                          }}
+                        />
+                      </Form.Item>
+                    </Form>
                   </Card>
 
                   {/* 通道配置 */}
@@ -431,9 +519,22 @@ const InstanceDetail: React.FC = () => {
                       
                       <Space>
                         <Text strong>启用状态: </Text>
-                        <Tag color={instance.config?.plugins?.includes('openclaw-weixin') ? 'success' : 'default'}>
-                          {instance.config?.plugins?.includes('openclaw-weixin') ? '✅ 已启用' : '❌ 已禁用'}
-                        </Tag>
+                        <Switch 
+                          checked={instance.config?.plugins?.includes('openclaw-weixin') || false}
+                          onChange={async (checked) => {
+                            try {
+                              const response = await api.put(`/instances/${instance.id}/plugins/openclaw-weixin`, {
+                                enabled: checked
+                              });
+                              if (response.data.success) {
+                                message.success(response.data.data.message);
+                                fetchInstance();
+                              }
+                            } catch (error) {
+                              message.error('更新失败');
+                            }
+                          }}
+                        />
                       </Space>
                     </Space>
                   </Card>
