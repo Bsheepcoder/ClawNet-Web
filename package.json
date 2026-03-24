@@ -1,6 +1,6 @@
 {
   "name": "@husile/clawnet-web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ClawNet Web UI - Modern web interface for ClawNet management",
   "type": "module",
   "scripts": {
